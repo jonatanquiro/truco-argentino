@@ -639,22 +639,22 @@
     : act.type === 'contraflor' || act.type === 'resto' ? `Yo cantaría ${E.FLOR_NAMES[act.type].toLowerCase()}.`
     : act.type === 'achico' ? 'Yo me achicaría.'
     : act.type === 'mazo' ? 'Yo me iría al mazo.' : '';
-  function consultPartner(h, q, legal, own) {
+  // Los cantos los decidís vos: el compañero te espera todo lo que haga falta
+  function consultPartner(h, q, legal, own, mode) {
     const m = S.match;
     if (!m || m.hand !== h || h.over) return Promise.resolve(null);
     return new Promise((resolve) => {
-      const text = `¿Qué hacemos? ${opinion(own)}`;
-      say(q, text, 9000);
+      const text = mode === 'call' ? `${callIdea(own)} ¿Canto?` : `¿Qué hacemos? ${opinion(own)}`;
+      say(q, text, 60000);
       log(`${nameOf(q)} (a vos): ${text}`, 'mate');
-      const timer = setTimeout(() => {
-        if (!S.consult || S.consult.q !== q) return;
-        S.consult = null;
-        if (m === S.match) render(m);
-        resolve(null);
-      }, 12000);
-      S.consult = { q, legal, own, resolve: (a) => { clearTimeout(timer); resolve(a); } };
+      S.consult = { q, legal, own, mode, resolve: (a) => { hideBubble(q); resolve(a); } };
       render(m);
     });
+  }
+  const callIdea = (act) => act.type === 'truco' ? `Yo cantaría ${E.TRUCO_NAMES[S.match.hand.trucoLevel + 1].toLowerCase()}.` : `Yo cantaría ${E.ENV_NAMES[act.kind].toLowerCase()}.`;
+  function hideBubble(q) {
+    const el = $('seat-bubble-' + q);
+    if (el) el.classList.remove('show');
   }
   $('my-hand').addEventListener('click', (e) => {
     const b = e.target.closest('.card');
@@ -732,6 +732,10 @@
     if (h.over) return '';
     const actor = E.actorOf(h);
     if (S.asking) return `${nameOf(S.asking.q)} te pregunta: ¿pone o viene? Contestá con ¡Poné! o ¡Vení!`;
+    if (S.consult && S.consult.mode === 'call') {
+      const c = S.consult;
+      return `${nameOf(c.q)} quiere cantar: ${callIdea(c.own)} Elegí qué canta o "No cantes".`;
+    }
     if (S.consult) {
       const c = S.consult;
       const what = h.florPending ? E.FLOR_NAMES[h.florPending.stage] : h.envPending ? E.ENV_NAMES[h.envCalls[h.envCalls.length - 1]] : E.TRUCO_NAMES[h.trucoPending.to];
