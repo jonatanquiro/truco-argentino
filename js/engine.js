@@ -126,6 +126,15 @@
     return isPie(h, p) && h.played[p].length === 0 && tantoOpen(h, team(p));
   }
 
+  /*
+   * El truco (y sus subidas) se puede cantar en cualquier momento de la mano, no sólo en tu turno,
+   * siempre que no haya otro canto esperando respuesta y tu equipo tenga el quiero (o nadie lo tenga).
+   */
+  function canCallTruco(h, p) {
+    return !h.over && !h.florPending && !h.envPending && !h.trucoPending && !mustSingFlor(h, p) &&
+      h.trucoLevel < 4 && (h.trucoOwner === null || h.trucoOwner === team(p));
+  }
+
   function envRaises(calls) {
     const has = (k) => calls.includes(k);
     const nEnv = calls.filter((k) => k === 'envido').length;
@@ -409,7 +418,7 @@
   }
 
   window.Engine = {
-    newHand, actorOf, legalActions, apply, envidoAvailable, mustSingFlor, mazoExtra, tantoWinner, team, isPie, pieOf, trucoResponder,
+    newHand, actorOf, legalActions, apply, envidoAvailable, mustSingFlor, mazoExtra, tantoWinner, team, isPie, pieOf, trucoResponder, canCallTruco,
     envAcceptedValue, envDeclinedValue, faltaValue, TRUCO_NAMES, ENV_NAMES, FLOR_NAMES
   };
 })();

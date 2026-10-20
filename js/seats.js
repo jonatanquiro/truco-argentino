@@ -42,11 +42,15 @@
     }
     async act(h, seat, legal, ctx) {
       await sleep((legal.kind === 'turn' && !legal.flor ? 750 : 950) * this.speed());
+      // si mientras pensaba alguien cantó truco, esta decisión ya no sirve
+      const live = ctx.live || (() => true);
+      if (!live()) return null;
       const think = (lg) => window.AI.decide(h, seat, lg || legal, { persona: this.persona, scores: ctx.scores, target: ctx.target, memory: this.memory, hints: ctx.hints });
       let act = think();
       if (this.consult && !legal.flor) {
         // si le cantaron a él, te dice qué haría y decidís vos por el equipo
         if (['truco', 'envido', 'flor'].includes(legal.kind)) {
+          if (!live()) return null;
           const yours = await this.consult(h, seat, legal, act, 'respond');
           return yours || act;
         }
@@ -54,6 +58,7 @@
         const hint = ctx.hints && ctx.hints[seat % 2];
         const asked = hint && hint.hand === h.no && ((hint.type === 'truco' && act.type === 'truco') || (hint.type === 'cantaenvido' && act.type === 'envido'));
         if ((act.type === 'truco' || act.type === 'envido') && !asked) {
+          if (!live()) return null;
           const calls = Object.assign({}, legal, { play: false, mazo: false, pass: true });
           const yours = await this.consult(h, seat, calls, act, 'call');
           if (yours && yours.type !== 'pass') return yours;
@@ -62,7 +67,7 @@
       }
       // si iba a tirar una carta, primero le pregunta al compañero (si corresponde) y vuelve a pensar con la respuesta
       // (ya decidió no cantar, así que vuelve a pensar sólo qué carta tirar)
-      if (act.type === 'play' && this.ask && (await this.ask(h, seat))) return think(Object.assign({}, legal, { truco: 0, envido: false, real: false, falta: false }));
+      if (act.type === 'play' && this.ask && live() && (await this.ask(h, seat))) return think(Object.assign({}, legal, { truco: 0, envido: false, real: false, falta: false }));
       return act;
     }
     // la lectura del humano sólo se hace mano a mano (en equipos hay varios a quienes leer)

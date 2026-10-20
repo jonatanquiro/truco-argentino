@@ -128,18 +128,37 @@
       return { seats: map, won: this.scores.map((x, t) => x - before[t]), hand: h };
     }
 
+    /*
+     * Cantar truco fuera de turno: corta lo que estaba pensando el que tenía que jugar
+     * y el canto se aplica en el momento. Devuelve true si se pudo.
+     */
+    callTruco(who) {
+      return this.interrupt ? this.interrupt(who) : false;
+    }
+
     async playHand() {
       const h = this.hand;
       while (!h.over) {
         const seat = E.actorOf(h);
         const legal = E.legalActions(h, seat);
-        this.pending = { seat, legal };
-        const decision = this.seat(seat).act(h, seat, legal, { scores: this.scores, target: this.target, hints: this.pica ? {} : this.hints });
+        const id = (this.decisionId = (this.decisionId || 0) + 1);
+        this.pending = { seat, legal, id };
+        let cut;
+        const interrupted = new Promise((res) => { cut = res; });
+        this.interrupt = (who) => {
+          if (!this.pending || this.pending.id !== id || who === seat || !E.canCallTruco(h, who)) return false;
+          cut({ seat: who, act: { type: 'truco' } });
+          return true;
+        };
+        const live = () => !!(this.pending && this.pending.id === id && !this.stopped);
+        const decision = this.seat(seat).act(h, seat, legal, { scores: this.scores, target: this.target, hints: this.pica ? {} : this.hints, live });
         this.view.render(this);
-        const act = await decision;
+        const res = await Promise.race([decision.then((act) => ({ seat, act })), interrupted]);
         this.pending = null;
+        this.interrupt = null;
         if (this.stopped) return false;
-        const events = E.apply(h, seat, act, this.scores, this.target);
+        if (res.seat !== seat && this.view.interrupted) this.view.interrupted(seat);
+        const events = E.apply(h, res.seat, res.act, this.scores, this.target);
         await this.view.showEvents(events);
         if (this.stopped) return false;
       }

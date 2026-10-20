@@ -633,3 +633,6 @@ button.seat-id:hover { box-shadow: 0 0 0 2px rgba(232, 179, 58, .7); }
   background: var(--gold); color: #2b1a05; box-shadow: 0 0 0 3px rgba(232, 179, 58, .4); animation: pulse 1s ease-in-out infinite;
 }
 @keyframes pulse { 50% { transform: scale(1.08); } }
+/* truco fuera de turno: sólo aparece ese botón, más discreto */
+.actions.out-turn { background: rgba(0, 0, 0, .15); }
+.actions.out-turn .btn.truco { opacity: .92; }

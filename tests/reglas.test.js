@@ -201,6 +201,22 @@ tr('al mazo con envido-envido pendiente = 2 + 1', [['envido', 'envido'], ['envid
   check('se anota quién ganó el envido para mostrar sus cartas', r.h.envResult.seat, 0);
 }
 
+{
+  // truco fuera de turno: el mano tira y, mientras piensa el rival, le canta truco
+  const T2 = ['1-espada', '1-basto', '7-espada', '4-copa', '5-copa', '6-copa'];
+  const h = E.newHand(0, { n: 2, flor: false, deck: deckWith(T2) });
+  const sc = [0, 0];
+  E.apply(h, 0, { type: 'play', card: h.cards[0][0] }, sc, 30);
+  check('fuera de turno: el que ya tiró puede cantar truco', [E.actorOf(h), E.canCallTruco(h, 0)], [1, true]);
+  E.apply(h, 0, { type: 'truco' }, sc, 30);
+  check('fuera de turno: contesta el rival y después sigue su turno', [E.actorOf(h), h.turn], [1, 1]);
+  check('fuera de turno: con un canto esperando respuesta no se puede cantar otro', E.canCallTruco(h, 0), false);
+  E.apply(h, 1, { type: 'quiero' }, sc, 30);
+  check('fuera de turno: después de querer, le toca tirar al rival, que tiene el quiero', [E.actorOf(h), E.canCallTruco(h, 1), E.canCallTruco(h, 0)], [1, true, false]);
+  const h4 = E.newHand(0, { n: 4, flor: false, deck: deckWith(TEAM) });
+  check('2v2: mi compañero (o yo) podemos cantar truco cuando le toca a otro', [E.canCallTruco(h4, 2), E.canCallTruco(h4, 3)], [true, true]);
+}
+
 /* ---------- Fin del partido ---------- */
 {
   const r = play({ mano: 1, ids: E33, scores: [28, 0] }, [['envido', 'envido'], ['quiero']]);

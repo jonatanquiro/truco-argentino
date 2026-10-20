@@ -421,6 +421,11 @@
       }
     },
 
+    interrupted() {
+      if (S.asking) { const a = S.asking; S.asking = null; $('talk').classList.remove('asking'); a.resolve(false); }
+      if (S.consult) { const c = S.consult; S.consult = null; c.resolve(null); }
+    },
+
     handResult(h) {
       // el que ganó el envido muestra sus cartas
       if (h.envResult && h.envResult.accepted && h.envResult.seat !== undefined && !h.florResult) {
@@ -671,8 +676,16 @@
     return m && m.pending && m.pending.seat === ME && S.local.waiting ? m.pending.legal : null;
   }
 
+  // ¿Puedo cantar truco ahora aunque no sea mi turno?
+  function outOfTurnTruco() {
+    const m = S.match;
+    if (!m || !m.hand || myLegal() || S.consult || S.asking || !m.pending || m.pending.seat === ME) return false;
+    return E.canCallTruco(m.hand, ME);
+  }
+
   $('actions').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
+    if (b && b.dataset.act === 'truco' && outOfTurnTruco()) { S.match.callTruco(ME); return; }
     if (!b || !myLegal()) return;
     const a = b.dataset.act;
     const act = a === 'envido' || a === 'real' || a === 'falta' ? { type: 'envido', kind: a } : { type: a };
@@ -904,8 +917,14 @@
       `<button type="button" class="card ${canPlay ? 'playable' : ''}" data-id="${c.id}" aria-label="${cardName(c)}" style="${fan(i, mn, 6)}" ${canPlay ? '' : 'tabindex="-1"'}>${cardSVG(c)}</button>`).join('');
 
     // Botones
+    const outTruco = outOfTurnTruco();
     document.querySelectorAll('#actions [data-act]').forEach((b) => {
       const a = b.dataset.act;
+      if (a === 'truco' && outTruco) {
+        b.classList.remove('hidden');
+        b.textContent = E.TRUCO_NAMES[h.trucoLevel + 1];
+        return;
+      }
       const show = !!(legal && (a === 'truco' ? legal.truco : legal[a]));
       b.classList.toggle('hidden', !show);
       if (a === 'truco' && show) {
@@ -913,7 +932,8 @@
         b.textContent = legal.kind === 'truco' ? 'Quiero ' + name.toLowerCase() : name;
       }
     });
-    $('actions').classList.toggle('idle', !legal);
+    $('actions').classList.toggle('idle', !legal && !outTruco);
+    $('actions').classList.toggle('out-turn', !legal && outTruco);
 
     // Datos de la mano
     const chips = [
