@@ -82,8 +82,23 @@
     return h.hasFlor[p] && !h.florDone && !h.florPending && h.trick === 0 && h.played[p].length === 0;
   }
 
+  /*
+   * En equipos, el tanto lo canta sólo el "pie" de cada equipo: los dos que cierran la primera ronda
+   * (en 2 contra 2 el 3.º y el 4.º; en 3 contra 3 el 5.º y el 6.º). Mano a mano, cualquiera de los dos.
+   */
+  function isPie(h, p) {
+    return h.n === 2 || (p - h.mano + h.n) % h.n >= h.n - 2;
+  }
+  function pieOf(h, t) {
+    for (let k = h.n - 2; k < h.n; k++) {
+      const q = (h.mano + k) % h.n;
+      if (team(q) === t) return q;
+    }
+    return null;
+  }
+
   function envidoAvailable(h, p) {
-    return !h.envDone && !h.envPending && h.trick === 0 && h.played[p].length === 0 &&
+    return isPie(h, p) && !h.envDone && !h.envPending && h.trick === 0 && h.played[p].length === 0 &&
       h.trucoLevel === 1 && (!h.trucoPending || team(h.trucoPending.caller) !== team(p));
   }
 
@@ -252,7 +267,7 @@
         h.envCallers.push(p);
         h.envPending = true;
         h.envCaller = p;
-        h.envResponder = nextOpponent(h, p);
+        h.envResponder = h.n === 2 ? nextOpponent(h, p) : pieOf(h, 1 - team(p)); // contesta (y sube) el pie del otro equipo
         ev.push({ t: 'say', p, text: '¡' + ENV_NAMES[act.kind] + '!', call: act.kind });
         break;
       }
@@ -363,7 +378,7 @@
   }
 
   window.Engine = {
-    newHand, actorOf, legalActions, apply, envidoAvailable, mustSingFlor, mazoExtra, tantoWinner, team,
+    newHand, actorOf, legalActions, apply, envidoAvailable, mustSingFlor, mazoExtra, tantoWinner, team, isPie, pieOf,
     envAcceptedValue, envDeclinedValue, faltaValue, TRUCO_NAMES, ENV_NAMES, FLOR_NAMES
   };
 })();

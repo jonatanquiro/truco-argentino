@@ -52,7 +52,7 @@
         }
         // si quiere cantar por su cuenta, te pide permiso (salvo que se lo hayas pedido vos)
         const hint = ctx.hints && ctx.hints[seat % 2];
-        const asked = hint && hint.hand === h.no && hint.type === 'truco' && act.type === 'truco';
+        const asked = hint && hint.hand === h.no && ((hint.type === 'truco' && act.type === 'truco') || (hint.type === 'cantaenvido' && act.type === 'envido'));
         if ((act.type === 'truco' || act.type === 'envido') && !asked) {
           const calls = Object.assign({}, legal, { play: false, mazo: false, pass: true });
           const yours = await this.consult(h, seat, calls, act, 'call');

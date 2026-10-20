@@ -1,5 +1,5 @@
 /* Guarda todo el juego en caché para jugar sin conexión. Cambiá VERSION al publicar cambios. */
-const VERSION = 'truco-v10';
+const VERSION = 'truco-v11';
 const FILES = [
   './',
   'index.html',

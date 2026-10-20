@@ -146,10 +146,9 @@ check('contraflor no querida = 4 al que la cantó', play({ mano: 0, ids: FF, flo
 // asientos 0 y 2 = nosotros, 1 y 3 = ellos
 const TEAM = ['4-oro', '5-copa', '6-basto', '7-copa', '2-copa', '1-basto', '7-oro', '6-oro', '2-espada', '12-basto', '11-basto', '4-espada'];
 {
-  const r = play({ n: 4, mano: 1, ids: TEAM }, [['envido', 'envido'], ['quiero']]);
+  // mano 1: los pie son el asiento 3 (ellos) y el 0 (nosotros)
+  const r = play({ n: 4, mano: 1, ids: TEAM }, [['play', '7-copa'], ['play', '7-oro'], ['envido', 'envido'], ['quiero']]);
   check('equipos: gana el mejor envido de cada equipo (33 de mi compañero)', r.sc, [2, 0]);
-  const t = play({ n: 4, mano: 1, ids: TEAM }, [['envido', 'envido']]);
-  check('equipos: contesta el rival que sigue en la ronda', E.actorOf(t.h), 2);
   const q = play({ n: 4, mano: 1, ids: TEAM }, [['truco'], ['quiero']]);
   check('equipos: el quiero es del equipo (mi compañero puede subir, el rival no)', [E.legalActions(q.h, 1).truco, q.h.trucoOwner], [0, 0]);
   const m = play({ n: 4, mano: 0, ids: TEAM }, [['mazo']]);
@@ -157,7 +156,20 @@ const TEAM = ['4-oro', '5-copa', '6-basto', '7-copa', '2-copa', '1-basto', '7-or
 }
 {
   const tie = ['7-oro', '6-oro', '4-basto', '7-copa', '6-copa', '4-espada', '10-oro', '11-oro', '12-oro', '10-copa', '11-copa', '12-copa'];
-  check('equipos: empate de envido lo gana el más cercano a la mano', play({ n: 4, mano: 1, ids: tie }, [['envido', 'envido'], ['quiero']]).sc, [0, 2]);
+  check('equipos: empate de envido lo gana el más cercano a la mano', play({ n: 4, mano: 1, ids: tie }, [['play', '7-copa'], ['play', '10-oro'], ['envido', 'envido'], ['quiero']]).sc, [0, 2]);
+}
+
+{
+  // el tanto lo cantan sólo los pie: con mano 0 en 2 contra 2, el 3.º (asiento 2) y el 4.º (asiento 3)
+  const h = E.newHand(0, { n: 4, flor: false, deck: deckWith(TEAM) });
+  check('2v2: el mano y el 2.º no pueden cantar envido', [E.envidoAvailable(h, 0), E.envidoAvailable(h, 1)], [false, false]);
+  check('2v2: el 3.º y el 4.º sí', [E.envidoAvailable(h, 2), E.envidoAvailable(h, 3)], [true, true]);
+  const r = play({ n: 4, mano: 0, ids: TEAM }, [['play', '4-oro'], ['play', '7-copa'], ['envido', 'envido']]);
+  check('2v2: cuando canta el pie (asiento 2), contesta el pie rival (asiento 3)', E.actorOf(r.h), 3);
+  const r2 = play({ n: 4, mano: 0, ids: TEAM }, [['play', '4-oro'], ['play', '7-copa'], ['envido', 'envido'], ['envido', 'real']]);
+  check('2v2: si el pie rival sube, vuelve a contestar mi pie', E.actorOf(r2.h), 2);
+  const h6 = E.newHand(1, { n: 6, flor: false });
+  check('3v3: sólo el 5.º y el 6.º pueden cantar tanto', [0, 1, 2, 3, 4, 5].map((q) => E.isPie(h6, q)), [true, false, false, false, false, true]);
 }
 
 /* ---------- Fin del partido ---------- */

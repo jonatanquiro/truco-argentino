@@ -511,6 +511,7 @@
     pone: ['¡Poné!', ['Dale, pongo.', 'Ahí va.']],
     veni: ['¡Vení!', ['Dale, te la dejo.', 'Listo, tiro baja.']],
     truco: ['¡Cantá truco!', ['Cuando me toque, canto.', 'Dejá, que canto yo.']],
+    cantaenvido: ['¡Cantá envido!', ['Dale, cuando me toque, canto.', 'Listo, canto el tanto.']],
     nocantes: ['No cantes truco.', ['Listo, no canto.', 'Ok, me quedo callado.']],
     envido: ['¿Cuánto tenés de envido?', null],
     como: ['¿Cómo venís?', null]
@@ -546,7 +547,7 @@
     const [text] = TALK[type];
     say(ME, text, 1600);
     log(`Vos (a tu equipo): ${text}`, 'me');
-    if (['pone', 'veni', 'truco', 'nocantes'].includes(type)) m.hints[0] = { type, hand: h.no, trick: h.trick };
+    if (['pone', 'veni', 'truco', 'nocantes', 'cantaenvido'].includes(type)) m.hints[0] = { type, hand: h.no, trick: h.trick };
     // si un compañero te estaba preguntando "¿Pongo o vengo?", contesta sólo él y juega
     if (S.asking && (type === 'pone' || type === 'veni')) {
       const a = S.asking;

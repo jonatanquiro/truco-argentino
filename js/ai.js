@@ -470,6 +470,10 @@
     if (legal.kind === 'flor') return decideFlor(h, me, legal, p, ctx, ev.flor());
     if (legal.kind === 'envido') return decideEnvidoResponse(h, me, legal, p, ctx, ev.env());
 
+    // si el compañero le ordenó cantar el tanto, lo canta
+    const order = ctx.hints && ctx.hints[me % 2];
+    if (legal.envido && order && order.hand === h.no && order.type === 'cantaenvido') return { type: 'envido', kind: 'envido' };
+
     // "El envido está primero": antes de responder el truco o jugar, ver si conviene cantar
     if (legal.envido || legal.real || legal.falta) {
       const call = decideEnvidoCall(h, me, legal, p, ctx, ev.env());
