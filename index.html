@@ -13,34 +13,130 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
-  <!-- Menú: elegir rival -->
-  <section id="menu" class="screen">
-    <header class="brand">
-      <div class="brand-cards" aria-hidden="true"><span></span><span></span><span></span></div>
-      <h1>Truco</h1>
-      <p class="tag">Argentino · mano a mano contra la máquina</p>
-    </header>
-
-    <div class="menu-options">
-      <div class="seg" role="radiogroup" aria-label="Puntos del partido">
-        <span class="seg-label">Partido a</span>
-        <button type="button" data-target="15" role="radio">15</button>
-        <button type="button" data-target="30" role="radio">30</button>
+<body data-felt="verde" data-back="rojo">
+  <!-- Inicio -->
+  <section id="home" class="screen menu-screen">
+    <div class="home">
+      <div class="home-logo">
+        <div class="brand-cards" aria-hidden="true"><span></span><span></span><span></span></div>
+        <h1>Truco</h1>
+        <p class="tag">Argentino</p>
       </div>
-      <div class="seg" role="radiogroup" aria-label="Flor">
-        <button type="button" data-flor="1" role="radio">Con flor</button>
-        <button type="button" data-flor="0" role="radio">Sin flor</button>
-      </div>
-      <button id="btn-install" class="btn ghost small hidden" type="button">⬇ Instalar app</button>
+      <nav class="home-menu" aria-label="Menú principal">
+        <button class="btn big primary" data-go="play" type="button">Jugar</button>
+        <button class="btn big" data-go="options" type="button">Opciones</button>
+        <button class="btn big ghost" data-go="rules" type="button">Reglas</button>
+        <button id="btn-install" class="btn big ghost hidden" type="button">Instalar app</button>
+      </nav>
+      <p class="home-foot">Se juega sin conexión · <span id="home-progress"></span></p>
     </div>
+  </section>
 
-    <h2 class="menu-title">Elegí tu rival</h2>
+  <!-- Elegir modo -->
+  <section id="play" class="screen menu-screen hidden">
+    <header class="menu-head">
+      <button class="btn ghost small" data-return type="button">← Volver</button>
+      <h2>Jugar</h2>
+      <span></span>
+    </header>
+    <div class="modes">
+      <button class="mode" data-go="career" type="button">
+        <span class="mode-icon" aria-hidden="true">🏆</span>
+        <span class="mode-text">
+          <span class="mode-title">Carrera</span>
+          <span class="mode-desc">Del almacén del barrio a la pulpería de Mandinga. Ganale a cada rival para desbloquear al siguiente.</span>
+          <span class="mode-meta" id="career-meta"></span>
+        </span>
+      </button>
+      <button class="mode" data-go="free" type="button">
+        <span class="mode-icon" aria-hidden="true">🃏</span>
+        <span class="mode-text">
+          <span class="mode-title">Partida libre</span>
+          <span class="mode-desc">Elegí cualquier rival y jugá un partido suelto.</span>
+        </span>
+      </button>
+      <button class="mode" data-quick type="button">
+        <span class="mode-icon" aria-hidden="true">⚡</span>
+        <span class="mode-text">
+          <span class="mode-title">Partida rápida</span>
+          <span class="mode-desc">Un rival al azar de tu nivel, a 15 puntos.</span>
+        </span>
+      </button>
+      <div class="mode disabled" aria-disabled="true">
+        <span class="mode-icon" aria-hidden="true">👥</span>
+        <span class="mode-text">
+          <span class="mode-title">Multijugador <span class="soon">Próximamente</span></span>
+          <span class="mode-desc">Jugá contra tus amigos, cada uno desde su celular.</span>
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Carrera -->
+  <section id="career" class="screen menu-screen hidden">
+    <header class="menu-head">
+      <button class="btn ghost small" data-return type="button">← Volver</button>
+      <h2>Carrera</h2>
+      <span class="head-meta" id="career-count"></span>
+    </header>
+    <div class="career-bar"><div id="career-fill"></div></div>
+    <ol class="ladder" id="ladder"></ol>
+  </section>
+
+  <!-- Partida libre -->
+  <section id="free" class="screen menu-screen hidden">
+    <header class="menu-head">
+      <button class="btn ghost small" data-return type="button">← Volver</button>
+      <h2>Elegí tu rival</h2>
+      <span></span>
+    </header>
+    <div class="tier-filter" id="tier-filter" role="tablist" aria-label="Filtrar por nivel"></div>
     <div id="personas" class="persona-grid"></div>
+  </section>
 
-    <details class="rules">
-      <summary>Cómo se juega</summary>
-      <div class="rules-body">
+  <!-- Opciones -->
+  <section id="options" class="screen menu-screen hidden">
+    <header class="menu-head">
+      <button class="btn ghost small" data-return type="button">← Volver</button>
+      <h2>Opciones</h2>
+      <span></span>
+    </header>
+    <div class="options">
+      <div class="opt-preview" aria-hidden="true">
+        <div class="mini-table"><div class="mini-card back"></div><div class="mini-card back"></div><div class="mini-card face"></div></div>
+      </div>
+      <div class="opt-group">
+        <h3>Mesa</h3>
+        <div class="opt-row"><span class="opt-label">Paño</span><div class="swatches" id="felt-swatches"></div></div>
+        <div class="opt-row"><span class="opt-label">Dorso de las cartas</span><div class="swatches" id="back-swatches"></div></div>
+        <div class="opt-row col"><span class="opt-label">Estilo de las cartas</span><div class="skins" id="skin-swatches"></div></div>
+      </div>
+      <div class="opt-group">
+        <h3>Partido</h3>
+        <div class="opt-row"><span class="opt-label">Puntos</span><div class="seg" data-opt="target"><button type="button" data-v="15">A 15</button><button type="button" data-v="30">A 30</button></div></div>
+        <div class="opt-row"><span class="opt-label">Flor</span><div class="seg" data-opt="flor"><button type="button" data-v="1">Con flor</button><button type="button" data-v="0">Sin flor</button></div></div>
+      </div>
+      <div class="opt-group">
+        <h3>Juego</h3>
+        <div class="opt-row"><span class="opt-label">Velocidad de la máquina</span><div class="seg" data-opt="speed"><button type="button" data-v="1.5">Tranqui</button><button type="button" data-v="1">Normal</button><button type="button" data-v="0.55">Rápida</button></div></div>
+        <div class="opt-row"><span class="opt-label">Resumen al terminar cada mano</span><div class="seg" data-opt="summary"><button type="button" data-v="0">No</button><button type="button" data-v="1">Sí</button></div></div>
+        <div class="opt-row"><span class="opt-label">Mostrar mis puntos de envido</span><div class="seg" data-opt="showEnv"><button type="button" data-v="1">Sí</button><button type="button" data-v="0">No</button></div></div>
+      </div>
+      <div class="opt-group">
+        <h3>Datos</h3>
+        <div class="opt-row"><span class="opt-label">Progreso de la carrera y estadísticas</span><button class="btn small danger" id="btn-reset" type="button">Borrar todo</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Reglas -->
+  <section id="rules" class="screen menu-screen hidden">
+    <header class="menu-head">
+      <button class="btn ghost small" data-return type="button">← Volver</button>
+      <h2>Reglas</h2>
+      <span></span>
+    </header>
+    <div class="rules-body">
         <p><b>Cartas:</b> mazo español de 40 (sin 8 ni 9). Cada uno recibe 3. Gana la mano quien gana 2 de las 3 bazas.</p>
         <p><b>De mayor a menor:</b> 1 de espada · 1 de basto · 7 de espada · 7 de oro · los 3 · los 2 · 1 de copa y de oro · los 12 · los 11 · los 10 · 7 de copa y de basto · los 6 · los 5 · los 4.</p>
         <p><b>Pardas:</b> si se empata la primera, gana quien gane la segunda. Si se empata una después, gana quien ganó la primera. Si todo es parda, gana el mano.</p>
@@ -48,15 +144,14 @@
         <p><b>Flor</b> (si se juega con flor): tres cartas del mismo palo. Es obligatorio cantarla antes de tirar tu primera carta y anula el envido. Si el otro no tiene, sumás 3. Si los dos tienen: <i>con flor me achico</i> (el que cantó suma 4), <i>contraflor</i> (6 al que tenga más; si no la quieren, 4) o <i>contraflor al resto</i> (como la falta envido). La flor vale 20 + las tres cartas.</p>
         <p><b>Truco:</b> la mano vale 1. Truco 2 · Retruco 3 · Vale cuatro 4. Si no te quieren, sumás lo que valía antes. Sólo puede subir quien tiene el quiero. Si te cantan truco en la primera, todavía podés cantar envido: <i>el envido está primero</i>.</p>
         <p><b>Al mazo:</b> abandonás la mano y el rival suma lo que valía. Si te vas en la primera sin que se haya jugado el envido, suma 2.</p>
-      </div>
-    </details>
-    <p class="foot">Funciona sin conexión. Instalala desde el menú del navegador o con el botón de arriba.</p>
+        <p><b>Atajos:</b> en la compu, las teclas 1, 2 y 3 tiran tus cartas.</p>
+    </div>
   </section>
 
   <!-- Mesa -->
   <section id="game" class="screen hidden">
     <header class="topbar">
-      <button id="btn-back" class="btn ghost small" type="button">← Rivales</button>
+      <button id="btn-back" class="btn ghost small" type="button">← Salir</button>
       <div class="top-title">Truco</div>
       <div class="top-score" id="top-score"></div>
     </header>
@@ -130,8 +225,9 @@
       <p class="modal-quote" id="modal-quote"></p>
       <p class="modal-score" id="modal-score"></p>
       <div class="modal-actions">
+        <button class="btn primary hidden" id="btn-next-rival" type="button">Siguiente rival</button>
         <button class="btn primary" id="btn-rematch" type="button">Revancha</button>
-        <button class="btn ghost" id="btn-menu" type="button">Elegir otro rival</button>
+        <button class="btn ghost" id="btn-menu" type="button">Volver al menú</button>
       </div>
     </div>
   </div>

@@ -4,33 +4,145 @@
   const E = window.Engine;
   const $ = (id) => document.getElementById(id);
   const ME = 0, OPP = 1; // asiento de este dispositivo y del rival
+  const PERSONAS = window.PERSONAS;
 
   /* ---------- Guardado local (puede fallar en modo privado) ---------- */
   const store = {
     get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin guardado */ } }
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin guardado */ } },
+    del(k) { try { localStorage.removeItem(k); } catch (e) { /* nada */ } }
   };
+
+  const FELTS = [
+    ['verde', 'Verde clásico', '#1f5c3c'], ['azul', 'Azul noche', '#1d3e66'], ['bordo', 'Bordó', '#5f1d2a'],
+    ['petroleo', 'Petróleo', '#145a5e'], ['grafito', 'Grafito', '#2b2f33'], ['marron', 'Tabaco', '#5b3a22']
+  ];
+  const BACKS = [['rojo', 'Rojo', '#a8362c'], ['azul', 'Azul', '#2d5aa0'], ['verde', 'Verde', '#2f7a46'], ['negro', 'Negro', '#33302c']];
+
+  const DEFAULTS = { target: 30, flor: true, felt: 'verde', back: 'rojo', skin: 'clasica', speed: 1, showEnv: true, summary: false };
+  const settings = Object.assign({}, DEFAULTS, store.get('truco.settings', {}));
+  // compatibilidad con la versión anterior
+  if (store.get('truco.target', null)) settings.target = store.get('truco.target', 30);
+  window.TrucoSettings = settings;
 
   const S = {
     persona: null,
-    target: store.get('truco.target', 30),
-    flor: store.get('truco.flor', true),
+    mode: 'free',     // 'career' | 'free' | 'quick'
     match: null,
     local: null,      // asiento LocalSeat de este dispositivo
-    fresh: null
+    fresh: null,
+    tier: 'all'
   };
 
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms * settings.speed));
   const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
   const oppName = () => S.persona.name;
   const who = (p) => (p === ME ? 'vos' : oppName());
+  const career = () => Math.min(PERSONAS.length, store.get('truco.career', 0)); // cuántos rivales ya venciste en orden
 
-  /* ---------- Menú ---------- */
-  function renderMenu() {
+  function saveSettings() {
+    store.set('truco.settings', settings);
+    store.del('truco.target');
+    applyTheme();
+  }
+  function applyTheme() {
+    document.body.dataset.felt = settings.felt;
+    document.body.dataset.back = settings.back;
+  }
+
+  /* ---------- Navegación (con el botón "atrás" del celular) ---------- */
+  const SCREENS = ['home', 'play', 'career', 'free', 'options', 'rules', 'game'];
+  let current = 'home';
+  const backStack = [];
+
+  function show(id) {
+    current = id;
+    SCREENS.forEach((s) => $(s).classList.toggle('hidden', s !== id));
+    document.body.classList.toggle('in-game', id === 'game');
+    if (id === 'home') renderHome();
+    if (id === 'play') renderPlay();
+    if (id === 'career') renderCareer();
+    if (id === 'free') renderFree();
+    if (id === 'options') renderOptions();
+    window.scrollTo(0, 0);
+  }
+  function go(id) {
+    backStack.push(current);
+    history.pushState({ screen: id }, '');
+    show(id);
+  }
+  function back() {
+    if (backStack.length) history.back();
+    else show('home');
+  }
+  window.addEventListener('popstate', () => {
+    if (current === 'game' && !leaveGame()) { history.pushState({ screen: 'game' }, ''); return; }
+    show(backStack.pop() || 'home');
+  });
+  history.replaceState({ screen: 'home' }, '');
+
+  document.addEventListener('click', (e) => {
+    const g = e.target.closest('[data-go]');
+    if (g) { go(g.dataset.go); return; }
+    if (e.target.closest('[data-return]')) back();
+  });
+
+  /* ---------- Inicio y modos ---------- */
+  function renderHome() {
+    const c = career();
+    $('home-progress').textContent = c >= PERSONAS.length ? 'Carrera completa 🏆' : `Carrera: ${c} de ${PERSONAS.length}`;
+  }
+  function renderPlay() {
+    const c = career();
+    $('career-meta').textContent = c >= PERSONAS.length ? '¡Completaste la carrera!' : `Próximo rival: ${PERSONAS[c].name} · ${c} de ${PERSONAS.length}`;
+  }
+
+  document.querySelector('[data-quick]').addEventListener('click', () => {
+    // un rival al azar cerca de tu progreso
+    const c = career();
+    const lo = Math.max(0, c - 2), hi = Math.min(PERSONAS.length - 1, c + 1);
+    const p = PERSONAS[lo + Math.floor(Math.random() * (hi - lo + 1))];
+    startMatch(p, 'quick');
+  });
+
+  /* ---------- Carrera ---------- */
+  function renderCareer() {
+    const c = career();
     const stats = store.get('truco.stats', {});
-    $('personas').innerHTML = window.PERSONAS.map((p) => {
+    $('career-count').textContent = `${c} / ${PERSONAS.length}`;
+    $('career-fill').style.width = (100 * c / PERSONAS.length) + '%';
+    let lastTier = '';
+    $('ladder').innerHTML = PERSONAS.map((p, i) => {
+      const state = i < c ? 'done' : i === c ? 'next' : 'locked';
       const st = stats[p.id] || { w: 0, l: 0 };
-      const pips = Array.from({ length: 8 }, (_, i) => `<i class="${i < p.level ? 'on' : ''}"></i>`).join('');
+      const tierHead = p.levelName !== lastTier ? `<li class="tier-head">${(lastTier = p.levelName)}</li>` : '';
+      const right = state === 'done' ? `<span class="rung-state">✓ Vencido</span><button class="btn small ghost" data-play="${p.id}" type="button">Revancha</button>`
+        : state === 'next' ? `<button class="btn small primary" data-play="${p.id}" type="button">Jugar</button>`
+        : '<span class="rung-state">🔒</span>';
+      return `${tierHead}<li class="rung ${state}" style="--accent:${p.color}">
+        <span class="rung-num">${p.level}</span>
+        <span class="rung-avatar">${state === 'locked' ? '?' : p.avatar}</span>
+        <span class="rung-info"><span class="rung-name">${state === 'locked' ? '???' : p.name}</span>
+          <span class="rung-desc">${state === 'locked' ? 'Ganale al anterior para conocerlo.' : (st.w || st.l ? `Ganaste ${st.w} · Perdiste ${st.l}` : p.desc)}</span></span>
+        <span class="rung-right">${right}</span>
+      </li>`;
+    }).join('');
+    const next = document.querySelector('.rung.next');
+    if (next) next.scrollIntoView({ block: 'center' });
+  }
+  $('ladder').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-play]');
+    if (b) startMatch(PERSONAS.find((p) => p.id === b.dataset.play), 'career');
+  });
+
+  /* ---------- Partida libre ---------- */
+  function renderFree() {
+    const tiers = ['all'].concat(window.PERSONA_TIERS);
+    $('tier-filter').innerHTML = tiers.map((t) => `<button type="button" role="tab" data-tier="${t}" aria-selected="${t === S.tier}">${t === 'all' ? 'Todos' : t}</button>`).join('');
+    const stats = store.get('truco.stats', {});
+    $('personas').innerHTML = PERSONAS.filter((p) => S.tier === 'all' || p.levelName === S.tier).map((p) => {
+      const st = stats[p.id] || { w: 0, l: 0 };
+      const pips = Array.from({ length: 16 }, (_, i) => `<i class="${i < p.level ? 'on' : ''}"></i>`).join('');
       return `<button class="persona" type="button" data-id="${p.id}" style="--accent:${p.color}">
         <div class="persona-head">
           <div class="persona-avatar">${p.avatar}</div>
@@ -44,64 +156,95 @@
         <div class="persona-foot"><span>Ganaste ${st.w} · Perdiste ${st.l}</span><span class="play">Jugar</span></div>
       </button>`;
     }).join('');
-    document.querySelectorAll('[data-target]').forEach((b) => b.setAttribute('aria-checked', String(+b.dataset.target === S.target)));
-    document.querySelectorAll('[data-flor]').forEach((b) => b.setAttribute('aria-checked', String((b.dataset.flor === '1') === S.flor)));
   }
-
+  $('tier-filter').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-tier]');
+    if (b) { S.tier = b.dataset.tier; renderFree(); }
+  });
   $('personas').addEventListener('click', (e) => {
     const b = e.target.closest('.persona');
-    if (b) startMatch(window.PERSONAS.find((p) => p.id === b.dataset.id));
+    if (b) startMatch(PERSONAS.find((p) => p.id === b.dataset.id), 'free');
   });
-  document.querySelectorAll('[data-target]').forEach((b) => b.addEventListener('click', () => {
-    S.target = +b.dataset.target;
-    store.set('truco.target', S.target);
-    renderMenu();
-  }));
-  document.querySelectorAll('[data-flor]').forEach((b) => b.addEventListener('click', () => {
-    S.flor = b.dataset.flor === '1';
-    store.set('truco.flor', S.flor);
-    renderMenu();
-  }));
 
-  function showScreen(id) {
-    $('menu').classList.toggle('hidden', id !== 'menu');
-    $('game').classList.toggle('hidden', id !== 'game');
-    document.body.classList.toggle('in-game', id === 'game');
-    window.scrollTo(0, 0);
+  /* ---------- Opciones ---------- */
+  function renderOptions() {
+    const sw = (list, key) => list.map(([id, name, color]) =>
+      `<button type="button" class="swatch" data-key="${key}" data-v="${id}" aria-pressed="${settings[key] === id}" title="${name}" style="--c:${color}"><span></span><em>${name}</em></button>`).join('');
+    $('felt-swatches').innerHTML = sw(FELTS, 'felt');
+    $('back-swatches').innerHTML = sw(BACKS, 'back');
+    const keep = settings.skin;
+    $('skin-swatches').innerHTML = Object.entries(window.Cards.SKINS).map(([id, k]) => {
+      settings.skin = id;
+      const face = cardSVG({ v: 7, s: 'oro', id: '7-oro' });
+      return `<button type="button" class="skin" data-key="skin" data-v="${id}" aria-pressed="${keep === id}"><span class="skin-card">${face}</span><em>${k.name}</em></button>`;
+    }).join('');
+    settings.skin = keep;
+    document.querySelectorAll('.seg[data-opt]').forEach((seg) => {
+      const k = seg.dataset.opt;
+      seg.querySelectorAll('button').forEach((b) => {
+        const v = settings[k];
+        const on = typeof v === 'boolean' ? (b.dataset.v === '1') === v : String(v) === b.dataset.v;
+        b.setAttribute('aria-pressed', String(on));
+      });
+    });
+    document.querySelector('.mini-card.face').innerHTML = cardSVG({ v: 1, s: 'espada', id: '1-espada' });
+    document.querySelectorAll('.mini-card.back').forEach((el) => { el.innerHTML = backSVG(); });
   }
+  $('options').addEventListener('click', (e) => {
+    const s = e.target.closest('.swatch, .skin');
+    if (s) { settings[s.dataset.key] = s.dataset.v; saveSettings(); renderOptions(); return; }
+    const b = e.target.closest('.seg[data-opt] button');
+    if (b) {
+      const k = b.closest('.seg').dataset.opt;
+      settings[k] = typeof DEFAULTS[k] === 'boolean' ? b.dataset.v === '1' : +b.dataset.v;
+      saveSettings();
+      renderOptions();
+    }
+  });
+  $('btn-reset').addEventListener('click', () => {
+    if (!confirm('¿Borrar el progreso de la carrera y las estadísticas?')) return;
+    store.del('truco.career');
+    store.del('truco.stats');
+    renderOptions();
+  });
 
+  /* ---------- Salir de la mesa ---------- */
   function stopMatch() {
     if (S.match) S.match.stop();
     S.match = null;
     $('modal').classList.add('hidden');
     $('hand-overlay').classList.add('hidden');
   }
-
-  $('btn-back').addEventListener('click', () => {
+  // true si se puede salir
+  function leaveGame() {
     const m = S.match;
-    if (m && m.winner === null && (m.scores[0] || m.scores[1]) && !confirm('¿Abandonar el partido?')) return;
+    if (m && m.winner === null && (m.scores[0] || m.scores[1]) && !confirm('¿Abandonar el partido?')) return false;
     stopMatch();
-    renderMenu();
-    showScreen('menu');
-  });
-  $('btn-menu').addEventListener('click', () => { stopMatch(); renderMenu(); showScreen('menu'); });
-  $('btn-rematch').addEventListener('click', () => startMatch(S.persona));
+    return true;
+  }
+  $('btn-back').addEventListener('click', () => back());
+  $('btn-menu').addEventListener('click', () => back());
+  $('btn-rematch').addEventListener('click', () => startMatch(S.persona, S.mode, true));
+  $('btn-next-rival').addEventListener('click', () => startMatch(PERSONAS[career()], 'career', true));
 
   /* ---------- Partido ---------- */
-  function startMatch(persona) {
+  function startMatch(persona, mode, replace) {
     stopMatch();
     S.persona = persona;
+    S.mode = mode;
     S.local = new window.Seats.LocalSeat();
-    const seats = [S.local, new window.Seats.AISeat(persona)];
-    const m = new window.Match({ seats, target: S.target, flor: S.flor, view });
+    const seats = [S.local, new window.Seats.AISeat(persona, () => settings.speed)];
+    const target = mode === 'quick' ? 15 : settings.target;
+    const m = new window.Match({ seats, target, flor: settings.flor, view });
     S.match = m;
     $('log').innerHTML = '';
     $('opp-avatar').textContent = persona.avatar;
     document.querySelector('.table').style.setProperty('--accent', persona.color);
     $('opp-name').textContent = persona.name;
     $('opp-level').textContent = 'Nivel ' + persona.level + ' · ' + persona.levelName;
-    showScreen('game');
-    log(`Partido a ${S.target}${S.flor ? ', con flor' : ', sin flor'}, contra ${persona.name}.`, 'sep');
+    if (current !== 'game') go('game');
+    else if (!replace) show('game');
+    log(`${mode === 'career' ? 'Carrera · ' : ''}Partido a ${target}${settings.flor ? ', con flor' : ', sin flor'}, contra ${persona.name}.`, 'sep');
     say(OPP, pickOne(persona.say.greet), 2400);
     m.run();
   }
@@ -140,11 +283,13 @@
       }
     },
 
-    handOver(h) {
+    async handOver(h) {
       const m = S.match;
       if (h.points) log(`+${h.points} para ${who(h.winner)} por la mano`, 'pts');
       bump(h.winner);
-      say(OPP, pickOne(h.winner === OPP ? S.persona.say.winHand : S.persona.say.loseHand), 1800);
+      say(OPP, pickOne(h.winner === OPP ? S.persona.say.winHand : S.persona.say.loseHand), 1600);
+      render(m, true);
+      if (!settings.summary) { await sleep(1700); return; }
       return new Promise((res) => {
         const reasons = {
           cards: (w) => (w === ME ? 'Ganaste con las cartas.' : `${oppName()} ganó con las cartas.`),
@@ -158,7 +303,6 @@
         lines.push(`Envido de cada uno: vos ${h.envPoints[ME]}, ${oppName()} ${h.envPoints[OPP]}.`);
         $('ov-detail').innerHTML = lines.join('<br>');
         $('hand-overlay').classList.remove('hidden');
-        render(m, true);
         const btn = $('btn-next');
         btn.focus();
         btn.onclick = () => { $('hand-overlay').classList.add('hidden'); res(); };
@@ -176,10 +320,19 @@
       if (won) st.w++; else st.l++;
       stats[S.persona.id] = st;
       store.set('truco.stats', stats);
+      const idx = PERSONAS.indexOf(S.persona);
+      let unlocked = null;
+      if (won && S.mode === 'career' && idx === career()) {
+        store.set('truco.career', idx + 1);
+        unlocked = PERSONAS[idx + 1] || null;
+      }
+      $('btn-next-rival').classList.toggle('hidden', !(S.mode === 'career' && won && career() < PERSONAS.length && PERSONAS[career()] !== S.persona));
+      $('btn-next-rival').textContent = career() < PERSONAS.length ? `Siguiente: ${PERSONAS[career()].name}` : '';
       $('modal-avatar').textContent = won ? '🏆' : S.persona.avatar;
       $('modal-title').textContent = won ? '¡Ganaste el partido!' : `Ganó ${oppName()}`;
       $('modal-quote').textContent = '“' + pickOne(won ? S.persona.say.loseGame : S.persona.say.winGame) + '”';
-      $('modal-score').textContent = `Vos ${m.scores[ME]} — ${m.scores[OPP]} ${oppName()}`;
+      $('modal-score').textContent = `Vos ${m.scores[ME]} — ${m.scores[OPP]} ${oppName()}`
+        + (unlocked ? ` · ¡Desbloqueaste a ${unlocked.name}!` : won && S.mode === 'career' && idx === PERSONAS.length - 1 ? ' · ¡Completaste la carrera!' : '');
       $('modal').classList.remove('hidden');
       $('btn-rematch').focus();
     }
@@ -353,9 +506,9 @@
     // Datos de la mano
     const chips = [
       ['Es mano', h.mano === ME ? 'vos' : p.name],
-      ['La mano vale', h.trucoLevel + (h.trucoLevel > 1 ? ' · ' + E.TRUCO_NAMES[h.trucoLevel] : '')],
-      [h.hasFlor[ME] ? 'Tu flor' : 'Tu envido', h.hasFlor[ME] ? h.florPts[ME] : h.envPoints[ME]]
+      ['La mano vale', h.trucoLevel + (h.trucoLevel > 1 ? ' · ' + E.TRUCO_NAMES[h.trucoLevel] : '')]
     ];
+    if (settings.showEnv) chips.push([h.hasFlor[ME] ? 'Tu flor' : 'Tu envido', h.hasFlor[ME] ? h.florPts[ME] : h.envPoints[ME]]);
     if (h.florResult) chips.push(['Flor', `+${h.florResult.points} ${who(h.florResult.winner)}`]);
     if (h.envResult) chips.push(['Envido', `+${h.envResult.points} ${who(h.envResult.winner)}`]);
     $('chips').innerHTML = chips.map(([k, v]) => `<div class="chip"><span>${k}</span><b>${v}</b></div>`).join('');
@@ -387,5 +540,6 @@
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
   }
 
-  renderMenu();
+  applyTheme();
+  show('home');
 })();

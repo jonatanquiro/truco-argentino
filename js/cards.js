@@ -106,37 +106,68 @@
     return `<g transform="translate(${x},${y}) scale(${scale})">${SUIT_SVG[s]}</g>`;
   }
 
+  /*
+   * Estilos de cartas ("skins"). Cada uno cambia papel, tinta y dibujo.
+   * Se elige en Opciones; se lee de window.TrucoSettings.skin.
+   */
+  const SKINS = {
+    clasica: { name: 'Clásica', paper: '#fffaf0', edge: '#bfae8a', inner: '#fbf3df', font: 'Georgia,serif', frame: true },
+    antigua: { name: 'Antigua', paper: '#efdfb8', edge: '#8b6b3e', inner: '#e8d4a6', font: 'Georgia,serif', frame: true,
+      ink: { oro: '#9a6c12', copa: '#86301f', espada: '#34496d', basto: '#4b6227' }, filter: 'sepia(.35) saturate(.85)' },
+    moderna: { name: 'Moderna', paper: '#ffffff', edge: '#d9d9d9', inner: '#ffffff', font: 'Segoe UI,system-ui,sans-serif', frame: false, modern: true },
+    noche: { name: 'Noche', paper: '#24211d', edge: '#4a443b', inner: '#2e2a24', font: 'Georgia,serif', frame: true,
+      ink: { oro: '#f2c14e', copa: '#ff7a66', espada: '#8fb3ff', basto: '#8fd36a' } }
+  };
+  const skin = () => SKINS[(window.TrucoSettings && window.TrucoSettings.skin) || 'clasica'] || SKINS.clasica;
+  const DASH = { oro: 'none', copa: '6 2', espada: '2 3', basto: '10 3' };
+
   function cardSVG(c) {
-    const col = SUIT_COLORS[c.s];
+    const k = skin();
+    const col = (k.ink && k.ink[c.s]) || SUIT_COLORS[c.s];
+    const style = k.filter ? ` style="filter:${k.filter}"` : '';
     let body = '';
+    if (k.modern) {
+      // número grande arriba, palo grande abajo: se lee de un vistazo
+      const label = FIGURES[c.v] ? FIGURES[c.v].charAt(0) : c.v;
+      body += `<text x="12" y="44" font-size="38" font-weight="800" fill="${col}" font-family="${k.font}">${label}</text>`;
+      body += suitAt(c.s, 22, 60, 0.55);
+      body += suitAt(c.s, 64, 108, c.v === 1 ? 1.75 : 1.45);
+      if (FIGURES[c.v]) body += `<text x="88" y="24" font-size="9" font-weight="700" fill="${col}" font-family="${k.font}" text-anchor="end" letter-spacing="1">${FIGURES[c.v]}</text>`;
+      return `<svg viewBox="0 0 100 150" class="card-svg" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="97" height="147" rx="11" fill="${k.paper}" stroke="${k.edge}" stroke-width="2"/>
+        <rect x="1.5" y="132" width="97" height="16.5" rx="0" fill="${col}" opacity=".12"/>
+        ${body}
+      </svg>`;
+    }
     if (FIGURES[c.v]) {
-      body += `<rect x="20" y="22" width="60" height="106" rx="5" fill="#fbf3df" stroke="${col}" stroke-width="2"/>`;
+      body += `<rect x="20" y="22" width="60" height="106" rx="5" fill="${k.inner}" stroke="${col}" stroke-width="2"/>`;
       body += suitAt(c.s, 50, 62, 1.35);
-      body += `<text x="50" y="112" text-anchor="middle" font-size="${c.v === 11 ? 10 : 13}" font-weight="700" fill="${col}" font-family="Georgia,serif" letter-spacing="1">${FIGURES[c.v]}</text>`;
+      body += `<text x="50" y="112" text-anchor="middle" font-size="${c.v === 11 ? 10 : 13}" font-weight="700" fill="${col}" font-family="${k.font}" letter-spacing="1">${FIGURES[c.v]}</text>`;
     } else {
-      const big = c.v === 1;
-      const scale = big ? 2.1 : c.v >= 6 ? 0.68 : 0.8;
+      const scale = c.v === 1 ? 2.1 : c.v >= 6 ? 0.68 : 0.8;
       for (const [x, y] of PIPS[c.v]) body += suitAt(c.s, x, y, scale);
     }
-    return `<svg viewBox="0 0 100 150" class="card-svg" aria-hidden="true">
-      <rect x="1.5" y="1.5" width="97" height="147" rx="9" fill="#fffaf0" stroke="#bfae8a" stroke-width="2"/>
-      <rect x="6" y="6" width="88" height="138" rx="6" fill="none" stroke="${col}" stroke-width="1.4" stroke-dasharray="${c.s === 'oro' ? 'none' : c.s === 'copa' ? '6 2' : c.s === 'espada' ? '2 3' : '10 3'}"/>
-      <text x="12" y="22" font-size="17" font-weight="700" fill="${col}" font-family="Georgia,serif">${c.v}</text>
-      <text x="88" y="140" font-size="17" font-weight="700" fill="${col}" font-family="Georgia,serif" text-anchor="end">${c.v}</text>
+    return `<svg viewBox="0 0 100 150" class="card-svg" aria-hidden="true"${style}>
+      <rect x="1.5" y="1.5" width="97" height="147" rx="9" fill="${k.paper}" stroke="${k.edge}" stroke-width="2"/>
+      ${k.frame ? `<rect x="6" y="6" width="88" height="138" rx="6" fill="none" stroke="${col}" stroke-width="1.4" stroke-dasharray="${DASH[c.s]}"/>` : ''}
+      <text x="12" y="22" font-size="17" font-weight="700" fill="${col}" font-family="${k.font}">${c.v}</text>
+      <text x="88" y="140" font-size="17" font-weight="700" fill="${col}" font-family="${k.font}" text-anchor="end">${c.v}</text>
       ${body}
     </svg>`;
   }
 
+  // El color del dorso sale de las variables CSS --back-a / --back-b (Opciones → Dorso)
   function backSVG() {
+    const k = skin();
     return `<svg viewBox="0 0 100 150" class="card-svg" aria-hidden="true">
       <defs><pattern id="bk" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-        <rect width="12" height="12" fill="#8e2a22"/><rect width="6" height="12" fill="#a8362c"/></pattern></defs>
-      <rect x="1.5" y="1.5" width="97" height="147" rx="9" fill="#fffaf0" stroke="#bfae8a" stroke-width="2"/>
+        <rect width="12" height="12" style="fill:var(--back-a,#8e2a22)"/><rect width="6" height="12" style="fill:var(--back-b,#a8362c)"/></pattern></defs>
+      <rect x="1.5" y="1.5" width="97" height="147" rx="9" fill="${k.modern ? '#ffffff' : k.paper === '#24211d' ? '#3a352e' : '#fffaf0'}" stroke="${k.edge}" stroke-width="2"/>
       <rect x="7" y="7" width="86" height="136" rx="6" fill="url(#bk)"/>
       <circle cx="50" cy="75" r="17" fill="#fffaf0" stroke="#e0a92e" stroke-width="3"/>
-      <text x="50" y="82" text-anchor="middle" font-size="20" font-weight="700" fill="#8e2a22" font-family="Georgia,serif">T</text>
+      <text x="50" y="82" text-anchor="middle" font-size="20" font-weight="700" style="fill:var(--back-a,#8e2a22)" font-family="Georgia,serif">T</text>
     </svg>`;
   }
 
-  window.Cards = { SUITS, VALUES, makeDeck, shuffle, rank, compare, envidoPoints, isFlor, florPoints, handWinner, cardName, cardSVG, backSVG };
+  window.Cards = { SUITS, VALUES, makeDeck, shuffle, rank, compare, envidoPoints, isFlor, florPoints, handWinner, cardName, cardSVG, backSVG, SKINS };
 })();

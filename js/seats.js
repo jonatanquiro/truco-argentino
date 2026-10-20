@@ -31,12 +31,13 @@
 
   // La máquina
   class AISeat {
-    constructor(persona) {
+    constructor(persona, speed) {
       this.persona = persona;
+      this.speed = speed || (() => 1);
       this.memory = window.AI.newMemory();
     }
     async act(h, seat, legal, ctx) {
-      await sleep(legal.kind === 'turn' && !legal.flor ? 750 : 950);
+      await sleep((legal.kind === 'turn' && !legal.flor ? 750 : 950) * this.speed());
       return window.AI.decide(h, seat, legal, { persona: this.persona, scores: ctx.scores, target: ctx.target, memory: this.memory });
     }
     onHandEnd(h) { window.AI.learn(this.memory, h); }

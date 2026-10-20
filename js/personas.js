@@ -1,18 +1,16 @@
-/* Los rivales. Cada uno es un nivel: cambian la precisión, cuánto mienten y cuánto arriesgan. */
+/*
+ * Los rivales. Cada uno tiene un nivel (1 a 16) y un estilo; los parámetros de juego salen de ahí.
+ * Para sumar un rival alcanza con agregar una entrada con su nivel, estilo, avatar y frases.
+ */
 window.PERSONAS = [
   {
     id: 'coca',
     name: 'Abuela Coca',
     level: 1,
-    levelName: 'Principiante',
+    style: ['equilibrado'],
     avatar: '👵',
     color: '#c27ba0',
     desc: 'Aprendió a jugar el domingo pasado en la casa de la nieta. Se olvida qué cartas salieron y casi nunca miente.',
-    ai: {
-      samples: 30, mistake: 0.3, noise: 0.22, model: 0.3, reads: false,
-      trucoCall: 0.75, trucoCaution: 0.18, trucoRaise: 0.92, bluff: 0.02, slowplay: 0,
-      envCall: 0.7, envReal: 0.88, envFalta: 0.97, envCaution: 0.18, envRaise: 0.9, envBluff: 0.02
-    },
     say: {
       flor: ['¡Flor! ¡Tres del mismo palo, como en la quiniela!'],
       greet: ['Ay, querido, tené paciencia que estoy aprendiendo.', '¿Cómo era? ¿El ancho de espada mata a todo?'],
@@ -35,15 +33,10 @@ window.PERSONAS = [
     id: 'lucho',
     name: 'Lucho',
     level: 2,
-    levelName: 'Aficionado',
+    style: ['mentiroso', 'agresivo'],
     avatar: '🧢',
     color: '#e08a2c',
     desc: 'El pibe del barrio. Canta todo lo que se mueve: mucho grito y poco fundamento. Si le aguantás, se cae solo.',
-    ai: {
-      samples: 70, mistake: 0.1, noise: 0.1, model: 0.5, reads: false,
-      trucoCall: 0.55, trucoCaution: -0.02, trucoRaise: 0.72, bluff: 0.28, slowplay: 0,
-      envCall: 0.48, envReal: 0.7, envFalta: 0.9, envCaution: -0.02, envRaise: 0.68, envBluff: 0.25
-    },
     say: {
       flor: ['¡FLOR, papá! ¡Tomá!'],
       greet: ['¿Qué hacés, maestro? Preparate que hoy vengo picante.', 'Dale que te dejo en cero.'],
@@ -65,16 +58,11 @@ window.PERSONAS = [
   {
     id: 'marta',
     name: 'Marta',
-    level: 3,
-    levelName: 'Intermedio',
+    level: 5,
+    style: ['prudente'],
     avatar: '👩‍🦱',
     color: '#4a9b8e',
     desc: 'La del almacén de la esquina. Prudente y calculadora: si canta, es porque tiene. Lleva la cuenta como la libreta del fiado.',
-    ai: {
-      samples: 120, mistake: 0.05, noise: 0.07, model: 0.65, reads: false,
-      trucoCall: 0.7, trucoCaution: 0.08, trucoRaise: 0.85, bluff: 0.05, slowplay: 0.1,
-      envCall: 0.62, envReal: 0.8, envFalta: 0.93, envCaution: 0.08, envRaise: 0.82, envBluff: 0.05
-    },
     say: {
       flor: ['Flor.'],
       greet: ['Buenas. Juguemos tranquilos, que después tengo que abrir.', 'A ver qué traés hoy.'],
@@ -96,16 +84,11 @@ window.PERSONAS = [
   {
     id: 'tano',
     name: 'El Tano Ferrari',
-    level: 4,
-    levelName: 'Avanzado',
+    level: 7,
+    style: ['mentiroso'],
     avatar: '🧔',
     color: '#c0392b',
     desc: 'Mentiroso de alto vuelo. Juega rápido, canta fuerte y te hace dudar de todo. Cuando calla, ojo.',
-    ai: {
-      samples: 180, mistake: 0.02, noise: 0.04, model: 0.8, reads: true,
-      trucoCall: 0.65, trucoCaution: 0.03, trucoRaise: 0.8, bluff: 0.15, slowplay: 0.25,
-      envCall: 0.56, envReal: 0.76, envFalta: 0.92, envCaution: 0.03, envRaise: 0.76, envBluff: 0.15
-    },
     say: {
       flor: ['¡Flor! Y de las lindas.'],
       greet: ['Sentate, sentate. Hoy te voy a enseñar algo.', 'Mirame a los ojos y decime que tenés buenas cartas.'],
@@ -127,16 +110,11 @@ window.PERSONAS = [
   {
     id: 'anselmo',
     name: 'Don Anselmo',
-    level: 5,
-    levelName: 'Experto',
+    level: 9,
+    style: ['equilibrado'],
     avatar: '🤠',
     color: '#8a6d3b',
     desc: 'Campeón invicto de la pulpería "La Esquina" desde el \'78. Cuenta las cartas, te lee la cara y te miente sin pestañear.',
-    ai: {
-      samples: 260, mistake: 0, noise: 0.015, model: 0.9, reads: true,
-      trucoCall: 0.66, trucoCaution: 0.03, trucoRaise: 0.8, bluff: 0.12, slowplay: 0.3,
-      envCall: 0.58, envReal: 0.78, envFalta: 0.92, envCaution: 0.05, envRaise: 0.78, envBluff: 0.1
-    },
     say: {
       flor: ['Flor, compadre. Así es la vida.'],
       greet: ['Buenas noches, m\'hijo. Siéntese, que el truco no se apura.', 'En este boliche me ganaron una sola vez. Y fue en el \'82.'],
@@ -158,16 +136,11 @@ window.PERSONAS = [
   {
     id: 'yamila',
     name: 'La Turca Yamila',
-    level: 6,
-    levelName: 'Maestra',
+    level: 11,
+    style: ['equilibrado'],
     avatar: '🧕',
     color: '#7d4bb3',
     desc: 'Tira el tarot los martes y las del truco todos los días. Te lee la cara mejor que vos mismo: cada canto tuyo le cuenta algo.',
-    ai: {
-      samples: 360, mistake: 0, noise: 0, model: 1, reads: true,
-      trucoCall: 0.66, trucoCaution: 0.03, trucoRaise: 0.8, bluff: 0.14, slowplay: 0.3,
-      envCall: 0.58, envReal: 0.78, envFalta: 0.92, envCaution: 0.05, envRaise: 0.78, envBluff: 0.12
-    },
     say: {
       flor: ['Flor. Ya lo veía venir en las cartas.'],
       greet: ['Dame la mano, querido… ah, mirá. Hoy no es tu noche.', 'Sentate. Las cartas ya me contaron cómo termina esto.'],
@@ -189,16 +162,11 @@ window.PERSONAS = [
   {
     id: 'profe',
     name: 'El Profe Gutiérrez',
-    level: 7,
-    levelName: 'Gran maestro',
+    level: 13,
+    style: ['prudente'],
     avatar: '👨‍🏫',
     color: '#2f6f9f',
     desc: 'Profesor de matemática jubilado. Escribió un libro de probabilidades del truco que nadie leyó. Cada canto suyo tiene la cuenta hecha.',
-    ai: {
-      samples: 480, mistake: 0, noise: 0, model: 1, reads: true,
-      trucoCall: 0.67, trucoCaution: 0.03, trucoRaise: 0.8, bluff: 0.11, slowplay: 0.35,
-      envCall: 0.58, envReal: 0.78, envFalta: 0.92, envCaution: 0.05, envRaise: 0.78, envBluff: 0.11
-    },
     say: {
       flor: ['Flor. Probabilidad: casi 5 %. Qué suerte la mía.'],
       greet: ['Buenas. Le adelanto que la varianza no perdona.', 'Siéntese. Hoy vamos a hablar de esperanza matemática.'],
@@ -220,16 +188,11 @@ window.PERSONAS = [
   {
     id: 'mandinga',
     name: 'Mandinga',
-    level: 8,
-    levelName: 'Jefe final',
+    level: 16,
+    style: ['equilibrado'],
     avatar: '😈',
     color: '#8b1a1a',
     desc: 'Dicen que aparece en los boliches de campaña pasada la medianoche y que nadie le ganó nunca. Juega fino, miente con criterio y aprende de cada mano tuya.',
-    ai: {
-      samples: 700, mistake: 0, noise: 0, model: 1, reads: true,
-      trucoCall: 0.66, trucoCaution: 0.03, trucoRaise: 0.8, bluff: 0.13, slowplay: 0.4,
-      envCall: 0.58, envReal: 0.78, envFalta: 0.92, envCaution: 0.04, envRaise: 0.78, envBluff: 0.12
-    },
     say: {
       flor: ['Flor. Del infierno vengo con ella.'],
       greet: ['Buenas noches, cristiano. ¿Qué apostamos? ¿El alma?', 'Al fin alguien con coraje. Sentate.'],
@@ -247,5 +210,256 @@ window.PERSONAS = [
       winGame: ['Otra alma para la colección. Volvé cuando quieras… siempre volvés.'],
       loseGame: ['Me ganaste… Hacía siglos que no pasaba. Esto no queda así.']
     }
+  },
+  {
+    id: 'sofi',
+    name: 'Sofi',
+    level: 3,
+    style: ['envidero'],
+    avatar: '👩‍🎓',
+    color: '#d16b8f',
+    desc: 'Estudiante de Sociales. Aprendió en los recreos del centro de estudiantes y le encanta cantar envido. Aprende rápido.',
+    say: {
+      flor: ['¡Flor! Esto lo tengo que contar en el grupo.'],
+      greet: ['¡Hola! Juego entre parcial y parcial, no me tengas piedad.', 'Dale, una rápida que tengo que estudiar.'],
+      truco: ['¡Truco!', 'Truco, ¿no?'],
+      retruco: ['¡Quiero retruco!'],
+      vale4: ['¡Vale cuatro, a todo o nada!'],
+      envido: ['¡Envido!', 'Envido, obvio.', 'Envidooo.'],
+      real: ['¡Real envido!'],
+      falta: ['¡Falta envido!'],
+      quiero: ['Quiero.', '¡Dale, quiero!'],
+      noquiero: ['No quiero.', 'Mmm, no.'],
+      mazo: ['Me voy al mazo.'],
+      winHand: ['¡Sí!', 'Bieeen.'],
+      loseHand: ['Uf.', 'Bueno, ya fue.'],
+      winGame: ['¡Gané! Me lo merezco después de esta semana.'],
+      loseGame: ['Me ganaste. La próxima vengo con apuntes.']
+    }
+  },
+  {
+    id: 'rulo',
+    name: 'Rulo',
+    level: 4,
+    style: ['prudente'],
+    avatar: '🚌',
+    color: '#3f8f5a',
+    desc: 'Chofer de la línea 60. Juega en la terminal entre vuelta y vuelta. Tranquilo, ordenado y difícil de apurar.',
+    say: {
+      flor: ['Flor. Como el boleto capicúa.'],
+      greet: ['Tengo veinte minutos hasta la próxima vuelta. Alcanza.', 'Subí, que arrancamos.'],
+      truco: ['Truco.', 'Va un truco, pibe.'],
+      retruco: ['Quiero retruco.'],
+      vale4: ['Vale cuatro. Fin del recorrido.'],
+      envido: ['Envido.'],
+      real: ['Real envido.'],
+      falta: ['Falta envido.'],
+      quiero: ['Quiero.', 'Dale, quiero.'],
+      noquiero: ['No quiero. Te dejo en la parada.', 'Paso.'],
+      mazo: ['Al mazo. Esta no para.'],
+      winHand: ['Siguiente parada.', 'Tranqui.'],
+      loseHand: ['Se me pasó la parada.', 'Bien ahí.'],
+      winGame: ['Terminal. Bajan todos.'],
+      loseGame: ['Me ganaste. Te debo un cortado.']
+    }
+  },
+  {
+    id: 'pocha',
+    name: 'Doña Pocha',
+    level: 6,
+    style: ['envidero', 'mentiroso'],
+    avatar: '👩‍🦳',
+    color: '#b5651d',
+    desc: 'Reina del club de jubilados de Villa Crespo. Habla sin parar para distraerte y te canta envido con lo que sea.',
+    say: {
+      flor: ['¡Flor! ¿Viste lo que es la experiencia, nene?'],
+      greet: ['Ay, sentate, ¿querés unas galletitas? Ah, y te voy a ganar.', 'En el club nadie me quiere jugar. Por algo será.'],
+      truco: ['¡Truco! Y no me mirés con esa cara.', 'Truco, querido.'],
+      retruco: ['¡Quiero retruco! ¿Qué te creíste?'],
+      vale4: ['¡Vale cuatro! Como en el setenta y uno.'],
+      envido: ['¡Envido!', 'Envido, mi vida.', 'Te canto envido, a ver.'],
+      real: ['¡Real envido! Uy, se me escapó.'],
+      falta: ['¡Falta envido! A esta edad no hay tiempo que perder.'],
+      quiero: ['Quiero, ¿cómo no?', 'Quiero, faltaba más.'],
+      noquiero: ['No quiero, querido.', 'Esta pasa.'],
+      mazo: ['Me voy al mazo, que se me enfría el té.'],
+      winHand: ['¡Ja! ¿Viste?', 'Esto en el club no pasa.'],
+      loseHand: ['Bueno, bueno.', 'Te dejé, ¿eh? Te dejé.'],
+      winGame: ['Gané. Contale a tu abuela que la saludo.'],
+      loseGame: ['Me ganaste. Pero el domingo hay revancha en el club.']
+    }
+  },
+  {
+    id: 'benitez',
+    name: 'El Negro Benítez',
+    level: 8,
+    style: ['agresivo'],
+    avatar: '🎸',
+    color: '#5a4a8a',
+    desc: 'Payador de Chascomús. Canta cada jugada en verso y te apura a puro ritmo. Debajo de la guitarra hay un jugador de verdad.',
+    say: {
+      flor: ['Flor de lindo lo que tengo, flor de lindo lo que traigo.'],
+      greet: ['Buenas noches, compañero, vengo a jugar y a cantar; si me gana, lo festejo, y si no, lo hago llorar.'],
+      truco: ['¡Truco le canto, paisano, que la mano está pa\' mí!', '¡Truco! Y a ver qué decís.'],
+      retruco: ['¡Quiero retruco, hermano, que no me asusto de vos!'],
+      vale4: ['¡Vale cuatro, y que lo diga la guitarra!'],
+      envido: ['Envido, por la flor del cardo.', '¡Envido, y le doy la mano!'],
+      real: ['¡Real envido, señor mío!'],
+      falta: ['¡Falta envido, que esto es todo o nada!'],
+      quiero: ['¡Quiero, y que suene el bordón!', 'Quiero, paisano.'],
+      noquiero: ['No quiero, que la noche es larga.', 'Ésta no, compañero.'],
+      mazo: ['Al mazo me voy cantando.'],
+      winHand: ['¡Y así se canta, señores!', 'Una más pa\'l cancionero.'],
+      loseHand: ['Bien jugada, compañero.', 'Se me desafinó la prima.'],
+      winGame: ['Gané la payada, paisano. Otra vez será.'],
+      loseGame: ['Me ganó en buena ley. Le dedico una milonga.']
+    }
+  },
+  {
+    id: 'chiche',
+    name: 'Chiche',
+    level: 10,
+    style: ['mentiroso'],
+    avatar: '🕶️',
+    color: '#2e7d7a',
+    desc: 'Cuidacoches de la cancha. Se pasa el día leyendo a la gente: sabe quién paga, quién miente y quién se achica.',
+    say: {
+      flor: ['Flor, jefe. Hoy estoy de suerte.'],
+      greet: ['Buenas, jefe. Se lo cuido, quédese tranquilo… el puntaje no.', 'Ah, lo conozco. Usted es de los que se achican.'],
+      truco: ['Truco, jefe.', 'Truco. ¿Se anima o se lo cuido?'],
+      retruco: ['Quiero retruco, maestro.'],
+      vale4: ['Vale cuatro. Lo que sea su voluntad.'],
+      envido: ['Envido, jefe.', 'Envido, y no se haga el distraído.'],
+      real: ['Real envido.'],
+      falta: ['Falta envido, jefe.'],
+      quiero: ['Quiero, maestro.', 'Quiero. Ya lo calé.'],
+      noquiero: ['No quiero. Se la dejo, jefe.', 'Paso, paso.'],
+      mazo: ['Al mazo. Mañana será otro día.'],
+      winHand: ['Gracias, jefe.', 'Ya lo tenía calado.'],
+      loseHand: ['Uh, me la hizo.', 'Bien ahí, maestro.'],
+      winGame: ['Se lo dejé impecable, jefe. Vuelva cuando quiera.'],
+      loseGame: ['Me ganó, jefe. Hoy no le cobro.']
+    }
+  },
+  {
+    id: 'gringa',
+    name: 'La Gringa Bauer',
+    level: 12,
+    style: ['prudente'],
+    avatar: '👱‍♀️',
+    color: '#4d6fa8',
+    desc: 'Tres veces campeona provincial en Santa Fe. Fría como la helada en el campo: no habla, no mira, no se equivoca.',
+    say: {
+      flor: ['Flor.'],
+      greet: ['Hola.', 'Empecemos.'],
+      truco: ['Truco.'],
+      retruco: ['Quiero retruco.'],
+      vale4: ['Vale cuatro.'],
+      envido: ['Envido.'],
+      real: ['Real envido.'],
+      falta: ['Falta envido.'],
+      quiero: ['Quiero.'],
+      noquiero: ['No.'],
+      mazo: ['Mazo.'],
+      winHand: ['Mhm.', '…'],
+      loseHand: ['Bien.', '…'],
+      winGame: ['Buen partido.'],
+      loseGame: ['Buen partido. De verdad.']
+    }
+  },
+  {
+    id: 'pibe',
+    name: 'El Pibe Maravilla',
+    level: 14,
+    style: ['agresivo', 'mentiroso'],
+    avatar: '🧒',
+    color: '#e0a020',
+    desc: 'Tiene 14 años y ya ganó el nacional juvenil. Calcula como el Profe, miente como el Tano y no le tiene miedo a nadie.',
+    say: {
+      flor: ['Flor. Ez.'],
+      greet: ['Hola, señor. ¿Usted también se va a enojar cuando pierda?', 'Mi viejo dice que no le gane a los grandes. No le hago caso.'],
+      truco: ['Truco.', 'Truco, jaja.'],
+      retruco: ['Quiero retruco. Obvio.'],
+      vale4: ['Vale cuatro. No me da miedo.'],
+      envido: ['Envido.', 'Envido, a ver.'],
+      real: ['Real envido.'],
+      falta: ['Falta envido.'],
+      quiero: ['Quiero.', 'Obvio que quiero.'],
+      noquiero: ['No quiero.', 'Nah.'],
+      mazo: ['Al mazo.'],
+      winHand: ['Ez.', 'Jaja.'],
+      loseHand: ['Bueno, esa sí.', 'Ok, bien.'],
+      winGame: ['Gané. ¿Otro? No se enoje, eh.'],
+      loseGame: ['Me ganó… ¿Me enseña cómo hizo eso?']
+    }
+  },
+  {
+    id: 'rivero',
+    name: 'El Gaucho Rivero',
+    level: 15,
+    style: ['equilibrado'],
+    avatar: '🐴',
+    color: '#7a5230',
+    desc: 'Leyenda de las pulperías de la provincia. Dicen que una noche le ganó a Mandinga… y que desde entonces lo anda buscando.',
+    say: {
+      flor: ['Flor, paisano. Del campo.'],
+      greet: ['Güenas. Siéntese, que la noche es larga y el truco es largo.', 'A mí me enseñó mi tata, y a él el suyo.'],
+      truco: ['Truco, paisano.', 'Truco. Despacito.'],
+      retruco: ['Quiero retruco.'],
+      vale4: ['Vale cuatro, y a la marchanta.'],
+      envido: ['Envido.'],
+      real: ['Real envido, paisano.'],
+      falta: ['Falta envido. Ahí va.'],
+      quiero: ['Quiero.', 'Le quiero, amigo.'],
+      noquiero: ['No quiero. Paciencia.', 'Ésa se la dejo.'],
+      mazo: ['Al mazo, que no corre apuro.'],
+      winHand: ['Así es la cosa.', 'Despacito se llega.'],
+      loseHand: ['Güena, paisano.', 'Se me fue esa.'],
+      winGame: ['Juega bien, paisano. Pero le falta campo.'],
+      loseGame: ['Me ganó en buena ley. Ahora vaya y búsquelo a Mandinga.']
+    }
   }
 ];
+
+(function () {
+  const TIERS = [[3, 'Principiante'], [6, 'Intermedio'], [9, 'Avanzado'], [12, 'Experto'], [15, 'Maestro'], [16, 'Leyenda']];
+  const MAX = 16;
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  // Cómo juega cada nivel: de 1 (se equivoca seguido, no lee al rival) a 16 (juego fino y lectura completa)
+  function aiFor(level, styles) {
+    const t = (level - 1) / (MAX - 1);
+    const ai = {
+      samples: Math.round(20 * Math.pow(800 / 20, t)),
+      mistake: 0.45 * Math.pow(1 - t, 2.5),
+      noise: 0.3 * Math.pow(1 - t, 2),
+      model: Math.min(1, 0.1 + 1.1 * t),
+      reads: level >= 6,
+      trucoCall: lerp(0.75, 0.66, t),
+      trucoCaution: lerp(0.18, 0.03, t),
+      trucoRaise: lerp(0.92, 0.8, t),
+      bluff: lerp(0.02, 0.12, t),
+      slowplay: lerp(0, 0.4, t),
+      envCall: lerp(0.7, 0.58, t),
+      envReal: lerp(0.88, 0.78, t),
+      envFalta: lerp(0.97, 0.92, t),
+      envCaution: lerp(0.18, 0.04, t),
+      envRaise: lerp(0.9, 0.78, t),
+      envBluff: lerp(0.02, 0.11, t)
+    };
+    for (const s of styles || []) {
+      if (s === 'mentiroso') { ai.bluff = ai.bluff * 1.6 + 0.05; ai.trucoCaution -= 0.02; ai.envBluff += 0.07; }
+      if (s === 'prudente') { ai.bluff *= 0.45; ai.trucoCaution += 0.04; ai.trucoCall += 0.03; ai.envCaution += 0.03; ai.envBluff *= 0.5; }
+      if (s === 'envidero') { ai.envCall -= 0.08; ai.envReal -= 0.06; ai.envBluff += 0.06; ai.envCaution -= 0.03; }
+      if (s === 'agresivo') { ai.trucoCall -= 0.06; ai.trucoRaise -= 0.05; ai.trucoCaution -= 0.03; }
+    }
+    return ai;
+  }
+
+  window.PERSONAS.sort((a, b) => a.level - b.level);
+  for (const p of window.PERSONAS) {
+    p.ai = aiFor(p.level, p.style);
+    p.levelName = TIERS.find(([max]) => p.level <= max)[1];
+  }
+  window.PERSONA_TIERS = TIERS.map(([, name]) => name);
+})();

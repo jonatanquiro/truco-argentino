@@ -6,18 +6,27 @@ Truco argentino mano a mano contra la máquina, en el navegador. Cinco rivales f
 
 Se puede **instalar como app (PWA)** y jugar **sin conexión**: en el celu, abrí el link y elegí *Agregar a la pantalla de inicio* / *Instalar app*; en la compu, el ícono de instalar en la barra de direcciones (o el botón *Instalar app* del menú). Después de la primera carga funciona sin internet.
 
+## Modos
+
+- **Carrera:** 16 rivales en orden, del almacén del barrio a Mandinga. Ganale a cada uno para desbloquear al siguiente.
+- **Partida libre:** cualquier rival, filtrando por categoría.
+- **Partida rápida:** un rival al azar cerca de tu nivel, a 15 puntos.
+- **Multijugador:** próximamente.
+
+En **Opciones** elegís el paño (6 colores), el dorso y el estilo de las cartas (clásica, antigua, moderna, noche), los puntos, con o sin flor, la velocidad de la máquina y si querés un resumen al terminar cada mano.
+
 ## Los rivales
 
-| Nivel | Rival | Estilo |
+| Nivel | Categoría | Rival |
 |---|---|---|
-| 1 · Principiante | **Abuela Coca** | Recién aprende. Se equivoca seguido y casi nunca miente. |
-| 2 · Aficionado | **Lucho** | El pibe del barrio. Canta todo, miente mucho y mal. |
-| 3 · Intermedio | **Marta** | La del almacén. Prudente: si canta, es porque tiene. |
-| 4 · Avanzado | **El Tano Ferrari** | Mentiroso de alto vuelo. Agresivo y bueno. |
-| 5 · Experto | **Don Anselmo** | Campeón de la pulpería. Cuenta las cartas y te lee. |
-| 6 · Maestra | **La Turca Yamila** | Cada canto tuyo le cuenta algo. |
-| 7 · Gran maestro | **El Profe Gutiérrez** | Profesor de matemática: todo con la cuenta hecha. |
-| 8 · Jefe final | **Mandinga** | El diablo en persona. Juega fino y aprende de cada mano tuya. |
+| 1–3 | Principiante | Abuela Coca · Lucho · Sofi |
+| 4–6 | Intermedio | Rulo · Marta · Doña Pocha |
+| 7–9 | Avanzado | El Tano Ferrari · El Negro Benítez · Don Anselmo |
+| 10–12 | Experto | Chiche · La Turca Yamila · La Gringa Bauer |
+| 13–15 | Maestro | El Profe Gutiérrez · El Pibe Maravilla · El Gaucho Rivero |
+| 16 | Leyenda | Mandinga |
+
+Cada rival tiene un nivel y un estilo (mentiroso, prudente, envidero, agresivo). Los parámetros de juego salen de esos dos datos (`js/personas.js`), así que sumar un rival nuevo es agregar una entrada con su nivel, estilo, avatar y frases.
 
 La máquina no hace trampa: sólo usa lo que vería un jugador de verdad (sus cartas, las que ya salieron, los cantos y los tantos que mostraste). Para decidir imagina muchas manos posibles tuyas, les da más peso a las que encajan con lo que hiciste ("cantó truco: algo tiene", "no quiso el envido: tiene poco") y las resuelve. Los niveles altos imaginan más manos, leen más fino, se equivocan menos y, desde el nivel 4, aprenden durante el partido cuánto mentís y cuánto te achicás.
 
