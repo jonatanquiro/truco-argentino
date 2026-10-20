@@ -17,7 +17,7 @@
       this.flor = flor;
       this.view = view;
       this.scores = [0, 0];
-      this.mano = Math.random() < 0.5 ? 0 : 1;
+      this.mano = Math.floor(Math.random() * seats.length);
       this.hand = null;
       this.pending = null;   // { seat, legal } mientras se espera una decisión
       this.stopped = false;
@@ -28,7 +28,7 @@
 
     async run() {
       while (!this.stopped) {
-        this.hand = E.newHand(this.mano, { flor: this.flor });
+        this.hand = E.newHand(this.mano, { flor: this.flor, n: this.seats.length });
         this.view.render(this);
         const ok = await this.playHand();
         if (!ok) return;
@@ -43,7 +43,7 @@
         }
         await this.view.handOver(h);
         if (this.stopped) return;
-        this.mano = 1 - this.mano;
+        this.mano = (this.mano + 1) % this.seats.length; // la mano pasa al de la derecha
       }
     }
 

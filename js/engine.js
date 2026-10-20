@@ -1,69 +1,90 @@
-/* Reglas del truco argentino (2 jugadores, con o sin flor). Jugador 0 = vos, 1 = la máquina. */
+/*
+ * Reglas del truco argentino para 2, 4 o 6 jugadores (mano a mano o por equipos), con o sin flor.
+ * Los asientos van en orden de juego; los pares son un equipo (0) y los impares el otro (1).
+ * Con 2 jugadores, asiento y equipo coinciden.
+ */
 (function () {
-  const { makeDeck, shuffle, compare, envidoPoints, florPoints, isFlor, handWinner } = window.Cards;
+  const { makeDeck, shuffle, rank, envidoPoints, florPoints, isFlor, handWinner } = window.Cards;
 
   const TRUCO_NAMES = { 2: 'Truco', 3: 'Retruco', 4: 'Vale cuatro' };
   const ENV_NAMES = { envido: 'Envido', real: 'Real envido', falta: 'Falta envido' };
   const FLOR_NAMES = { flor: 'Flor', contraflor: 'Contraflor', resto: 'Contraflor al resto', achico: 'Con flor me achico' };
   const ENV_VALUE = { envido: 2, real: 3 };
+  const team = (p) => p % 2;
 
-  // opts.deck permite repartir un mazo ya mezclado (p. ej. el que manda el anfitrión en una partida en red)
+  // opts: { n: 2|4|6, flor, deck } — deck permite repartir un mazo ya mezclado (p. ej. el de un anfitrión en red)
   function newHand(mano, opts) {
-    const deck = opts && opts.deck ? opts.deck : shuffle(makeDeck());
-    const cards = [deck.slice(0, 3), deck.slice(3, 6)];
-    const florOn = !opts || opts.flor !== false;
+    const o = opts || {};
+    const n = o.n || 2;
+    const deck = o.deck ? o.deck : shuffle(makeDeck());
+    const cards = Array.from({ length: n }, (_, p) => deck.slice(p * 3, p * 3 + 3));
+    const florOn = o.flor !== false;
+    const fill = (v) => Array.from({ length: n }, () => (typeof v === 'function' ? v() : v));
     return {
+      n,
       mano,
-      cards,                      // cartas que quedan en la mano
-      orig: [cards[0].slice(), cards[1].slice()],
-      played: [[], []],           // cartas jugadas, en orden de baza
+      cards,                      // cartas que quedan en la mano de cada uno
+      orig: cards.map((c) => c.slice()),
+      played: fill(() => []),     // cartas jugadas, en orden de baza
       trick: 0,
       turn: mano,
-      trickCards: [null, null],
-      results: [],                // 0 / 1 / 'p' por baza
+      trickCards: fill(null),
+      trickLeader: mano,
+      trickLog: [],               // por baza: { cards: [...por asiento], r, seat }
+      results: [],                // por baza: equipo ganador 0/1 o 'p'
       trucoLevel: 1,              // lo que vale la mano ahora
-      trucoOwner: null,           // quién tiene el quiero (puede subir); null = cualquiera
-      trucoPending: null,         // { to, caller }
-      trucoCalls: [0, 0],         // cuántas veces cantó/subió cada uno
+      trucoOwner: null,           // equipo que tiene el quiero (puede subir); null = cualquiera
+      trucoPending: null,         // { to, caller, responder }
+      trucoCalls: fill(0),
       envCalls: [],               // ['envido','real',...]
       envCallers: [],
       envPending: false,
       envCaller: null,
+      envResponder: null,
       envDone: false,
-      envPoints: [envidoPoints(cards[0]), envidoPoints(cards[1])],
-      envKnown: [null, null],     // puntos de envido que el rival llegó a ver
+      envPoints: cards.map(envidoPoints),
+      envKnown: fill(null),       // puntos de envido que se llegaron a mostrar
       envResult: null,
       florOn,
-      hasFlor: [florOn && isFlor(cards[0]), florOn && isFlor(cards[1])],
-      florPts: [florPoints(cards[0]), florPoints(cards[1])],
-      florSung: [false, false],
-      florPending: null,          // { stage: 'flor'|'contraflor'|'resto', caller, from }
+      hasFlor: cards.map((c) => florOn && isFlor(c)),
+      florPts: cards.map(florPoints),
+      florSung: fill(false),
+      florPending: null,          // { stage: 'flor'|'contraflor'|'resto', caller, responder, from }
       florDone: false,
-      florKnown: [null, null],
+      florKnown: fill(null),
       florResult: null,
-      hist: [],                   // lo que hizo cada uno (la máquina lo usa para "leer" al rival)
+      hist: [],                   // lo que hizo cada uno (la máquina lo usa para "leer" a los demás)
       over: false,
-      winner: null,
+      winner: null,               // equipo ganador
       points: 0,
       endReason: ''
     };
   }
 
   function actorOf(h) {
-    if (h.florPending) return 1 - h.florPending.caller;
-    if (h.envPending) return 1 - h.envCaller;
-    if (h.trucoPending) return 1 - h.trucoPending.caller;
+    if (h.florPending) return h.florPending.responder;
+    if (h.envPending) return h.envResponder;
+    if (h.trucoPending) return h.trucoPending.responder;
     return h.turn;
+  }
+
+  // El primero del otro equipo (en orden de juego después de p) que cumpla la condición
+  function nextOpponent(h, p, cond) {
+    for (let k = 1; k < h.n; k++) {
+      const q = (p + k) % h.n;
+      if (team(q) !== team(p) && (!cond || cond(q))) return q;
+    }
+    return null;
   }
 
   // La flor es obligatoria: si la tenés, la cantás antes de tirar tu primera carta
   function mustSingFlor(h, p) {
-    return h.hasFlor[p] && !h.florSung[p] && !h.florDone && !h.florPending && h.trick === 0 && h.played[p].length === 0;
+    return h.hasFlor[p] && !h.florDone && !h.florPending && h.trick === 0 && h.played[p].length === 0;
   }
 
   function envidoAvailable(h, p) {
     return !h.envDone && !h.envPending && h.trick === 0 && h.played[p].length === 0 &&
-      h.trucoLevel === 1 && (!h.trucoPending || h.trucoPending.caller !== p);
+      h.trucoLevel === 1 && (!h.trucoPending || team(h.trucoPending.caller) !== team(p));
   }
 
   function envRaises(calls) {
@@ -110,7 +131,7 @@
     }
     a.play = true;
     a.mazo = true;
-    if (h.trucoLevel < 4 && (h.trucoOwner === null || h.trucoOwner === p)) a.truco = h.trucoLevel + 1;
+    if (h.trucoLevel < 4 && (h.trucoOwner === null || h.trucoOwner === team(p))) a.truco = h.trucoLevel + 1;
     if (envidoAvailable(h, p)) Object.assign(a, envRaises([]));
     return a;
   }
@@ -136,6 +157,32 @@
     return h.trick === 0 && !h.envDone ? 1 : 0;
   }
 
+  /*
+   * Quién gana un tanto (envido o flor): se dice en orden desde la mano; el empate lo gana el más cercano a la mano.
+   * Devuelve { team, seat } y, si se pasa `ev`, agrega lo que dice cada uno.
+   */
+  function tantoWinner(h, pts, eligible, ev, known) {
+    let best = null;
+    for (let k = 0; k < h.n; k++) {
+      const q = (h.mano + k) % h.n;
+      if (eligible && !eligible(q)) continue;
+      if (!best) {
+        best = { team: team(q), seat: q, pts: pts[q] };
+        if (known) known[q] = pts[q];
+        if (ev) ev.push({ t: 'say', p: q, text: 'Tengo ' + pts[q] + '.' });
+      } else if (team(q) !== best.team) {
+        if (pts[q] > best.pts) {
+          best = { team: team(q), seat: q, pts: pts[q] };
+          if (known) known[q] = pts[q];
+          if (ev) ev.push({ t: 'say', p: q, text: pts[q] + ' son mejores.' });
+        } else if (ev) {
+          ev.push({ t: 'say', p: q, text: 'Son buenas.' });
+        }
+      }
+    }
+    return best;
+  }
+
   function endHand(h, winner, points, reason) {
     h.over = true;
     h.winner = winner;
@@ -143,28 +190,37 @@
     h.endReason = reason;
   }
 
-  // Mano dice primero; el otro dice los suyos sólo si gana
-  function showdown(ev, h, pts, known) {
-    const m = h.mano, nm = 1 - m;
-    const w = pts[nm] > pts[m] ? nm : m;
-    known[m] = pts[m];
-    ev.push({ t: 'say', p: m, text: 'Tengo ' + pts[m] + '.' });
-    if (w === nm) {
-      known[nm] = pts[nm];
-      ev.push({ t: 'say', p: nm, text: pts[nm] + ' son mejores.' });
-    } else {
-      ev.push({ t: 'say', p: nm, text: 'Son buenas.' });
+  function resolveTrick(h, ev) {
+    const leader = h.trickLeader;
+    let top = -1;
+    for (let p = 0; p < h.n; p++) top = Math.max(top, rank(h.trickCards[p]));
+    let winSeat = null;
+    const teams = new Set();
+    for (let k = 0; k < h.n; k++) {
+      const q = (leader + k) % h.n;
+      if (rank(h.trickCards[q]) === top) {
+        teams.add(team(q));
+        if (winSeat === null) winSeat = q;
+      }
     }
-    return w;
+    const r = teams.size > 1 ? 'p' : team(winSeat);
+    h.results.push(r);
+    h.trickLog.push({ cards: h.trickCards.slice(), r, seat: r === 'p' ? null : winSeat });
+    ev.push({ t: 'trick', r, trick: h.trick, seat: r === 'p' ? null : winSeat });
+    const w = handWinner(h.results, team(h.mano));
+    h.trickCards = h.trickCards.map(() => null);
+    h.trick++;
+    h.turn = r === 'p' ? h.mano : winSeat;
+    h.trickLeader = h.turn;
+    if (w !== null) endHand(h, w, h.trucoLevel, 'cards');
   }
 
   /*
    * Aplica una acción. Devuelve una lista de eventos para mostrar.
-   * scores se modifica in situ para los puntos de envido y flor (se anotan al momento).
+   * scores (por equipo) se modifica in situ para los puntos de envido y flor (se anotan al momento).
    */
   function apply(h, p, act, scores, target) {
     const ev = [];
-    const o = 1 - p;
     h.hist.push({
       p, type: act.type, kind: act.kind, trick: h.trick,
       ctx: h.florPending ? 'flor' : h.envPending ? 'envido' : h.trucoPending ? 'truco' : 'turn',
@@ -178,24 +234,14 @@
         h.played[p].push(card);
         h.trickCards[p] = card;
         ev.push({ t: 'play', p, card });
-        if (h.trickCards[o]) {
-          const r = compare(h.trickCards[0], h.trickCards[1]);
-          h.results.push(r);
-          ev.push({ t: 'trick', r, trick: h.trick });
-          const w = handWinner(h.results, h.mano);
-          h.trickCards = [null, null];
-          h.trick++;
-          h.turn = r === 'p' ? h.mano : r;
-          if (w !== null) endHand(h, w, h.trucoLevel, 'cards');
-        } else {
-          h.turn = o;
-        }
+        if (h.trickCards.every(Boolean)) resolveTrick(h, ev);
+        else h.turn = (p + 1) % h.n;
         break;
       }
       case 'truco': {
         if (h.trucoPending) h.trucoLevel = h.trucoPending.to; // subir implica querer lo anterior
         const to = h.trucoLevel + 1;
-        h.trucoPending = { to, caller: p };
+        h.trucoPending = { to, caller: p, responder: nextOpponent(h, p) };
         h.trucoCalls[p]++;
         ev.push({ t: 'say', p, text: to === 2 ? '¡Truco!' : to === 3 ? '¡Quiero retruco!' : '¡Quiero vale cuatro!', call: 'truco', to });
         break;
@@ -205,6 +251,7 @@
         h.envCallers.push(p);
         h.envPending = true;
         h.envCaller = p;
+        h.envResponder = nextOpponent(h, p);
         ev.push({ t: 'say', p, text: '¡' + ENV_NAMES[act.kind] + '!', call: act.kind });
         break;
       }
@@ -213,13 +260,16 @@
         h.envPending = false;   // la flor anula el envido
         h.envDone = true;
         ev.push({ t: 'say', p, text: '¡Flor!', call: 'flor' });
-        if (h.hasFlor[o]) {
-          h.florPending = { stage: 'flor', caller: p };
+        const rival = nextOpponent(h, p, (q) => h.hasFlor[q]);
+        if (rival !== null) {
+          h.florPending = { stage: 'flor', caller: p, responder: rival };
         } else {
+          // si nadie del otro equipo tiene, cada flor del equipo vale 3
+          const count = h.hasFlor.filter((f, q) => f && team(q) === team(p)).length;
           h.florDone = true;
-          scores[p] += 3;
-          h.florResult = { winner: p, points: 3 };
-          ev.push({ t: 'flor', winner: p, points: 3 });
+          scores[team(p)] += 3 * count;
+          h.florResult = { winner: team(p), points: 3 * count };
+          ev.push({ t: 'flor', winner: team(p), points: 3 * count });
         }
         break;
       }
@@ -227,13 +277,13 @@
       case 'resto': {
         h.florSung[p] = true;
         const from = h.florPending.stage;
-        h.florPending = { stage: act.type, caller: p, from };
+        h.florPending = { stage: act.type, caller: p, responder: nextOpponent(h, p, (q) => h.hasFlor[q]), from };
         ev.push({ t: 'say', p, text: '¡' + FLOR_NAMES[act.type] + '!', call: act.type });
         break;
       }
       case 'achico': {
         h.florSung[p] = true;
-        const c = h.florPending.caller;
+        const c = team(h.florPending.caller);
         h.florPending = null;
         h.florDone = true;
         scores[c] += 4;
@@ -248,7 +298,7 @@
           const st = h.florPending.stage;
           h.florPending = null;
           h.florDone = true;
-          const w = showdown(ev, h, h.florPts, h.florKnown);
+          const w = tantoWinner(h, h.florPts, (q) => h.hasFlor[q], ev, h.florKnown).team;
           const val = st === 'resto' ? faltaValue(scores, target, w) : 6;
           scores[w] += val;
           h.florResult = { winner: w, points: val };
@@ -256,16 +306,14 @@
         } else if (h.envPending) {
           h.envPending = false;
           h.envDone = true;
-          const e = h.envPoints, m = h.mano, nm = 1 - m;
-          const w = e[nm] > e[m] ? nm : m;
+          const w = tantoWinner(h, h.envPoints, null, ev, h.envKnown).team;
           const val = envAcceptedValue(h.envCalls, scores, target, w);
-          showdown(ev, h, e, h.envKnown);
           scores[w] += val;
           h.envResult = { winner: w, points: val, accepted: true };
           ev.push({ t: 'envido', winner: w, points: val });
         } else if (h.trucoPending) {
           h.trucoLevel = h.trucoPending.to;
-          h.trucoOwner = p;
+          h.trucoOwner = team(p);
           h.trucoPending = null;
         }
         break;
@@ -277,30 +325,31 @@
           const val = fp.stage === 'resto' && fp.from === 'contraflor' ? 6 : 4;
           h.florPending = null;
           h.florDone = true;
-          scores[fp.caller] += val;
-          h.florResult = { winner: fp.caller, points: val };
-          ev.push({ t: 'flor', winner: fp.caller, points: val });
+          scores[team(fp.caller)] += val;
+          h.florResult = { winner: team(fp.caller), points: val };
+          ev.push({ t: 'flor', winner: team(fp.caller), points: val });
         } else if (h.envPending) {
           const val = envDeclinedValue(h.envCalls);
           h.envPending = false;
           h.envDone = true;
-          scores[h.envCaller] += val;
-          h.envResult = { winner: h.envCaller, points: val, accepted: false };
-          ev.push({ t: 'envido', winner: h.envCaller, points: val });
+          scores[team(h.envCaller)] += val;
+          h.envResult = { winner: team(h.envCaller), points: val, accepted: false };
+          ev.push({ t: 'envido', winner: team(h.envCaller), points: val });
         } else if (h.trucoPending) {
-          endHand(h, h.trucoPending.caller, h.trucoLevel, 'noquiero');
+          endHand(h, team(h.trucoPending.caller), h.trucoLevel, 'noquiero');
           h.trucoPending = null;
         }
         break;
       }
       case 'mazo': {
+        // en equipos, irse al mazo es abandonar la mano por todo el equipo
         ev.push({ t: 'say', p, text: 'Me voy al mazo.' });
         const extra = mazoExtra(h);
         if (h.trucoPending) {
-          endHand(h, h.trucoPending.caller, h.trucoLevel + extra, 'mazo');
+          endHand(h, team(h.trucoPending.caller), h.trucoLevel + extra, 'mazo');
           h.trucoPending = null;
         } else {
-          endHand(h, o, h.trucoLevel + extra, 'mazo');
+          endHand(h, 1 - team(p), h.trucoLevel + extra, 'mazo');
         }
         break;
       }
@@ -313,7 +362,7 @@
   }
 
   window.Engine = {
-    newHand, actorOf, legalActions, apply, envidoAvailable, mustSingFlor, mazoExtra,
+    newHand, actorOf, legalActions, apply, envidoAvailable, mustSingFlor, mazoExtra, tantoWinner, team,
     envAcceptedValue, envDeclinedValue, faltaValue, TRUCO_NAMES, ENV_NAMES, FLOR_NAMES
   };
 })();

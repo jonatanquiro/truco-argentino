@@ -40,7 +40,8 @@
       await sleep((legal.kind === 'turn' && !legal.flor ? 750 : 950) * this.speed());
       return window.AI.decide(h, seat, legal, { persona: this.persona, scores: ctx.scores, target: ctx.target, memory: this.memory });
     }
-    onHandEnd(h) { window.AI.learn(this.memory, h); }
+    // la lectura del humano sólo se hace mano a mano (en equipos hay varios a quienes leer)
+    onHandEnd(h) { if (h.n === 2) window.AI.learn(this.memory, h); }
   }
 
   window.Seats = { LocalSeat, AISeat };

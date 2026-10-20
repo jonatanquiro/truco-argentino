@@ -44,7 +44,7 @@
         <span class="mode-icon" aria-hidden="true">🏆</span>
         <span class="mode-text">
           <span class="mode-title">Carrera</span>
-          <span class="mode-desc">Del almacén del barrio a la pulpería de Mandinga. Ganale a cada rival para desbloquear al siguiente.</span>
+          <span class="mode-desc">Recorré las 24 provincias, de la Ciudad de Buenos Aires a Tierra del Fuego. Ganale a cada rival para desbloquear al siguiente.</span>
           <span class="mode-meta" id="career-meta"></span>
         </span>
       </button>
@@ -62,11 +62,18 @@
           <span class="mode-desc">Un rival al azar de tu nivel, a 15 puntos.</span>
         </span>
       </button>
-      <div class="mode disabled" aria-disabled="true">
+      <button class="mode" data-go="teams" type="button">
         <span class="mode-icon" aria-hidden="true">👥</span>
         <span class="mode-text">
-          <span class="mode-title">Multijugador <span class="soon">Próximamente</span></span>
-          <span class="mode-desc">Jugá contra tus amigos, cada uno desde su celular.</span>
+          <span class="mode-title">Por equipos</span>
+          <span class="mode-desc">2 contra 2 o 3 contra 3: vos y compañeros de la máquina contra otro equipo.</span>
+        </span>
+      </button>
+      <div class="mode disabled" aria-disabled="true">
+        <span class="mode-icon" aria-hidden="true">🌐</span>
+        <span class="mode-text">
+          <span class="mode-title">Online <span class="soon">Próximamente</span></span>
+          <span class="mode-desc">Jugá contra tus amigos, cada uno desde su celular.
         </span>
       </div>
     </div>
@@ -92,6 +99,28 @@
     </header>
     <div class="tier-filter" id="tier-filter" role="tablist" aria-label="Filtrar por nivel"></div>
     <div id="personas" class="persona-grid"></div>
+  </section>
+
+  <!-- Por equipos -->
+  <section id="teams" class="screen menu-screen hidden">
+    <header class="menu-head">
+      <button class="btn ghost small" data-return type="button">← Volver</button>
+      <h2>Por equipos</h2>
+      <span></span>
+    </header>
+    <div class="teams">
+      <div class="seg team-size"><button type="button" data-size="2">2 contra 2</button><button type="button" data-size="3">3 contra 3</button></div>
+      <div class="team-cols">
+        <div class="team-col us"><h3>Tu equipo</h3><div id="team-us"></div></div>
+        <div class="team-vs">VS</div>
+        <div class="team-col them"><h3>Rivales</h3><div id="team-them"></div></div>
+      </div>
+      <p class="team-meta" id="team-meta"></p>
+      <div class="team-actions">
+        <button class="btn ghost" id="btn-shuffle" type="button">🎲 Mezclar</button>
+        <button class="btn primary big" id="btn-team-play" type="button">Jugar</button>
+      </div>
+    </div>
   </section>
 
   <!-- Opciones -->
@@ -170,7 +199,9 @@
           <div class="hand opp-hand" id="opp-hand"></div>
         </div>
 
+        <div class="ring hidden" id="ring"></div>
         <div class="center">
+          <div class="team-center hidden" id="team-center"><div class="tsum" id="tsum"></div><div class="tring" id="tring"></div></div>
           <div class="tricks" id="tricks"></div>
           <div class="status" id="status" aria-live="polite"></div>
         </div>

@@ -36,8 +36,13 @@
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms * settings.speed));
   const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  // Quién es quién en la mesa (asiento → personaje; el 0 sos vos)
+  const isTeamGame = () => !!(S.match && S.match.seats.length > 2);
+  const personaOf = (seat) => (S.match && S.match.personas ? S.match.personas[seat] : S.persona);
+  const nameOf = (seat) => (seat === ME ? 'Vos' : personaOf(seat).name);
   const oppName = () => S.persona.name;
-  const who = (p) => (p === ME ? 'vos' : oppName());
+  // equipo → cómo nombrarlo
+  const who = (t) => (isTeamGame() ? (t === 0 ? 'tu equipo' : 'los rivales') : t === ME ? 'vos' : oppName());
   const career = () => Math.min(PERSONAS.length, store.get('truco.career', 0)); // cuántos rivales ya venciste en orden
 
   function saveSettings() {
@@ -51,7 +56,7 @@
   }
 
   /* ---------- Navegación (con el botón "atrás" del celular) ---------- */
-  const SCREENS = ['home', 'play', 'career', 'free', 'options', 'rules', 'game'];
+  const SCREENS = ['home', 'play', 'career', 'free', 'teams', 'options', 'rules', 'game'];
   let current = 'home';
   const backStack = [];
 
@@ -63,6 +68,7 @@
     if (id === 'play') renderPlay();
     if (id === 'career') renderCareer();
     if (id === 'free') renderFree();
+    if (id === 'teams') renderTeams();
     if (id === 'options') renderOptions();
     window.scrollTo(0, 0);
   }
@@ -111,18 +117,18 @@
     const stats = store.get('truco.stats', {});
     $('career-count').textContent = `${c} / ${PERSONAS.length}`;
     $('career-fill').style.width = (100 * c / PERSONAS.length) + '%';
-    let lastTier = '';
+    let lastProv = '';
     $('ladder').innerHTML = PERSONAS.map((p, i) => {
       const state = i < c ? 'done' : i === c ? 'next' : 'locked';
       const st = stats[p.id] || { w: 0, l: 0 };
-      const tierHead = p.levelName !== lastTier ? `<li class="tier-head">${(lastTier = p.levelName)}</li>` : '';
+      const tierHead = p.province !== lastProv ? `<li class="tier-head"><span>${(lastProv = p.province)}</span><em>${p.region} · ${p.levelName}</em></li>` : '';
       const right = state === 'done' ? `<span class="rung-state">✓ Vencido</span><button class="btn small ghost" data-play="${p.id}" type="button">Revancha</button>`
         : state === 'next' ? `<button class="btn small primary" data-play="${p.id}" type="button">Jugar</button>`
         : '<span class="rung-state">🔒</span>';
       return `${tierHead}<li class="rung ${state}" style="--accent:${p.color}">
         <span class="rung-num">${p.level}</span>
         <span class="rung-avatar">${state === 'locked' ? '?' : p.avatar}</span>
-        <span class="rung-info"><span class="rung-name">${state === 'locked' ? '???' : p.name}</span>
+        <span class="rung-info"><span class="rung-name">${state === 'locked' ? '???' : p.name}${p.champion && state !== 'locked' ? ' <span class="crown" title="Campeón de la provincia">👑</span>' : ''}</span>
           <span class="rung-desc">${state === 'locked' ? 'Ganale al anterior para conocerlo.' : (st.w || st.l ? `Ganaste ${st.w} · Perdiste ${st.l}` : p.desc)}</span></span>
         <span class="rung-right">${right}</span>
       </li>`;
@@ -137,19 +143,21 @@
 
   /* ---------- Partida libre ---------- */
   function renderFree() {
-    const tiers = ['all'].concat(window.PERSONA_TIERS);
-    $('tier-filter').innerHTML = tiers.map((t) => `<button type="button" role="tab" data-tier="${t}" aria-selected="${t === S.tier}">${t === 'all' ? 'Todos' : t}</button>`).join('');
+    const tiers = ['all', 'champions'].concat(window.REGIONS);
+    const label = (t) => (t === 'all' ? 'Todos' : t === 'champions' ? '👑 Campeones' : t);
+    $('tier-filter').innerHTML = tiers.map((t) => `<button type="button" role="tab" data-tier="${t}" aria-selected="${t === S.tier}">${label(t)}</button>`).join('');
     const stats = store.get('truco.stats', {});
-    $('personas').innerHTML = PERSONAS.filter((p) => S.tier === 'all' || p.levelName === S.tier).map((p) => {
+    const show = (p) => S.tier === 'all' || (S.tier === 'champions' ? p.champion : p.region === S.tier);
+    $('personas').innerHTML = PERSONAS.filter(show).map((p) => {
       const st = stats[p.id] || { w: 0, l: 0 };
-      const pips = Array.from({ length: 16 }, (_, i) => `<i class="${i < p.level ? 'on' : ''}"></i>`).join('');
+      const pips = `<i style="width:${Math.round(100 * p.level / PERSONAS.length)}%"></i>`;
       return `<button class="persona" type="button" data-id="${p.id}" style="--accent:${p.color}">
         <div class="persona-head">
           <div class="persona-avatar">${p.avatar}</div>
           <div class="persona-titles">
             <div class="persona-name">${p.name}${st.w ? '<span class="badge">🏆 ' + st.w + '</span>' : ''}</div>
-            <div class="persona-level">Nivel ${p.level} · ${p.levelName}</div>
-            <div class="pips" aria-hidden="true">${pips}</div>
+            <div class="persona-level">Nivel ${p.level} · ${p.levelName} · ${p.province}</div>
+            <div class="diff" aria-hidden="true">${pips}</div>
           </div>
         </div>
         <p class="persona-desc">${p.desc}</p>
@@ -164,6 +172,61 @@
   $('personas').addEventListener('click', (e) => {
     const b = e.target.closest('.persona');
     if (b) startMatch(PERSONAS.find((p) => p.id === b.dataset.id), 'free');
+  });
+
+  /* ---------- Por equipos: armado ---------- */
+  const T = store.get('truco.teamSetup', { size: 2, mates: [], rivals: [] });
+  const byId = (id) => PERSONAS.find((p) => p.id === id);
+  function randomAround(count, exclude) {
+    // personajes cerca de tu progreso en la carrera
+    const c = career();
+    const lo = Math.max(0, c - 6), hi = Math.min(PERSONAS.length - 1, c + 6);
+    const pool = PERSONAS.slice(lo, hi + 1).filter((p) => !exclude.includes(p.id));
+    const out = [];
+    while (out.length < count && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0].id);
+    return out;
+  }
+  function fixTeams() {
+    const want = T.size - 1;
+    T.mates = T.mates.filter(byId).slice(0, want);
+    T.rivals = T.rivals.filter(byId).slice(0, T.size);
+    if (T.mates.length < want) T.mates = T.mates.concat(randomAround(want - T.mates.length, T.mates.concat(T.rivals)));
+    if (T.rivals.length < T.size) T.rivals = T.rivals.concat(randomAround(T.size - T.rivals.length, T.mates.concat(T.rivals)));
+    store.set('truco.teamSetup', T);
+  }
+  function personaSelect(kind, i, id) {
+    let html = `<select class="pick" data-kind="${kind}" data-i="${i}" aria-label="${kind === 'mates' ? 'Compañero' : 'Rival'} ${i + 1}">`;
+    let prov = '';
+    for (const p of PERSONAS) {
+      if (p.province !== prov) { html += (prov ? '</optgroup>' : '') + `<optgroup label="${p.province}">`; prov = p.province; }
+      html += `<option value="${p.id}" ${p.id === id ? 'selected' : ''}>${p.avatar} ${p.name} · nivel ${p.level}</option>`;
+    }
+    return html + '</optgroup></select>';
+  }
+  function slot(kind, i, id) {
+    const p = byId(id);
+    return `<div class="team-slot" style="--accent:${p.color}"><span class="slot-avatar">${p.avatar}</span>${personaSelect(kind, i, id)}</div>`;
+  }
+  function renderTeams() {
+    fixTeams();
+    document.querySelectorAll('[data-size]').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.size === T.size)));
+    $('team-us').innerHTML = `<div class="team-slot me"><span class="slot-avatar">🙂</span><span class="slot-name">Vos</span></div>` + T.mates.map((id, i) => slot('mates', i, id)).join('');
+    $('team-them').innerHTML = T.rivals.map((id, i) => slot('rivals', i, id)).join('');
+    const lvl = (ids) => Math.round(ids.reduce((a, id) => a + byId(id).level, 0) / ids.length);
+    $('team-meta').textContent = `Nivel promedio de los rivales: ${lvl(T.rivals)}`;
+  }
+  $('teams').addEventListener('change', (e) => {
+    const sel = e.target.closest('.pick');
+    if (!sel) return;
+    T[sel.dataset.kind][+sel.dataset.i] = sel.value;
+    store.set('truco.teamSetup', T);
+    renderTeams();
+  });
+  $('teams').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-size]');
+    if (b) { T.size = +b.dataset.size; renderTeams(); return; }
+    if (e.target.closest('#btn-shuffle')) { T.mates = []; T.rivals = []; renderTeams(); return; }
+    if (e.target.closest('#btn-team-play')) startTeamMatch(T.mates.map(byId), T.rivals.map(byId));
   });
 
   /* ---------- Opciones ---------- */
@@ -224,7 +287,7 @@
   }
   $('btn-back').addEventListener('click', () => back());
   $('btn-menu').addEventListener('click', () => back());
-  $('btn-rematch').addEventListener('click', () => startMatch(S.persona, S.mode, true));
+  $('btn-rematch').addEventListener('click', () => (S.mode === 'team' ? startTeamMatch(S.team.mates, S.team.rivals, true) : startMatch(S.persona, S.mode, true)));
   $('btn-next-rival').addEventListener('click', () => startMatch(PERSONAS[career()], 'career', true));
 
   /* ---------- Partido ---------- */
@@ -236,7 +299,9 @@
     const seats = [S.local, new window.Seats.AISeat(persona, () => settings.speed)];
     const target = mode === 'quick' ? 15 : settings.target;
     const m = new window.Match({ seats, target, flor: settings.flor, view });
+    m.personas = [null, persona];
     S.match = m;
+    setTableMode(2);
     $('log').innerHTML = '';
     $('opp-avatar').textContent = persona.avatar;
     document.querySelector('.table').style.setProperty('--accent', persona.color);
@@ -249,6 +314,48 @@
     m.run();
   }
 
+  // 2 contra 2 o 3 contra 3: los asientos alternan equipos (pares: el tuyo, impares: los rivales)
+  const POS = { 4: [null, 'right', 'top', 'left'], 6: [null, 'br', 'tr', 'top', 'tl', 'bl'] };
+  function startTeamMatch(mates, rivals, replace) {
+    stopMatch();
+    S.mode = 'team';
+    S.team = { mates, rivals };
+    S.persona = rivals[0];
+    S.local = new window.Seats.LocalSeat();
+    const n = (mates.length + 1) * 2;
+    const personas = [null];
+    for (let q = 1; q < n; q++) personas.push(q % 2 ? rivals[(q - 1) / 2] : mates[q / 2 - 1]);
+    const seats = personas.map((p, q) => (q === 0 ? S.local : new window.Seats.AISeat(p, () => settings.speed)));
+    const m = new window.Match({ seats, target: settings.target, flor: settings.flor, view });
+    m.personas = personas;
+    S.match = m;
+    setTableMode(n);
+    $('ring').innerHTML = personas.map((p, q) => (q === 0 ? '' : `
+      <div class="seat pos-${POS[n][q]} ${q % 2 ? 'them' : 'us'}" data-seat="${q}" style="--accent:${p.color}">
+        <div class="seat-id"><span class="seat-avatar">${p.avatar}</span><span class="seat-text"><b>${p.name}</b><em>${q % 2 ? 'Rival' : 'Compañero'} · nivel ${p.level}</em></span></div>
+        <div class="seat-cards" id="seat-cards-${q}"></div>
+        <div class="bubble seat-bubble" id="seat-bubble-${q}"></div>
+      </div>`)).join('');
+    if (current !== 'game') go('game');
+    else if (!replace) show('game');
+    $('log').innerHTML = '';
+    log(`Partido ${n / 2} contra ${n / 2} a ${settings.target}${settings.flor ? ', con flor' : ', sin flor'}. Tu equipo: vos, ${mates.map((x) => x.name).join(' y ')}.`, 'sep');
+    say(1, pickOne(rivals[0].say.greet), 2400);
+    m.run();
+  }
+
+  function setTableMode(n) {
+    const team = n > 2;
+    const t = document.querySelector('.table');
+    t.classList.toggle('team-mode', team);
+    t.classList.toggle('six', n === 6);
+    $('ring').classList.toggle('hidden', !team);
+    $('team-center').classList.toggle('hidden', !team);
+    document.querySelector('.opp-zone').classList.toggle('hidden', team);
+    $('tricks').classList.toggle('hidden', team);
+    if (team) t.style.setProperty('--accent', 'var(--gold)');
+  }
+
   const live = (m) => m === S.match && !m.stopped;
 
   const view = {
@@ -259,21 +366,21 @@
       for (const ev of events) {
         if (!live(m)) return;
         if (ev.t === 'say') {
-          const text = ev.p === OPP ? personaLine(ev) : ev.text;
+          const text = ev.p !== ME ? personaLine(ev) : ev.text;
           say(ev.p, text, 1600);
-          log(ev.p === ME ? `Vos: ${ev.text}` : `${oppName()}: ${text}`, ev.p === ME ? 'me' : '');
+          log(ev.p === ME ? `Vos: ${ev.text}` : `${nameOf(ev.p)}: ${text}`, ev.p === ME ? 'me' : ev.p % 2 === 0 ? 'mate' : '');
           render(m);
-          await sleep(ev.p === OPP ? 950 : 500);
+          await sleep(ev.p !== ME ? 950 : 500);
         } else if (ev.t === 'play') {
           S.fresh = ev.card.id;
-          log(ev.p === ME ? `Tirás el ${cardName(ev.card)}` : `${oppName()} tira el ${cardName(ev.card)}`, 'play');
+          log(ev.p === ME ? `Tirás el ${cardName(ev.card)}` : `${nameOf(ev.p)} tira el ${cardName(ev.card)}`, 'play');
           render(m);
-          await sleep(ev.p === OPP ? 380 : 180);
+          await sleep(ev.p !== ME ? 380 : 180);
         } else if (ev.t === 'trick') {
           const n = ['Primera', 'Segunda', 'Tercera'][ev.trick];
-          log(ev.r === 'p' ? `${n}: parda` : `${n} para ${who(ev.r)}`);
+          log(ev.r === 'p' ? `${n}: parda` : `${n} para ${who(ev.r)}${isTeamGame() ? ` (${nameOf(ev.seat)})` : ''}`);
           render(m);
-          await sleep(700);
+          await sleep(isTeamGame() ? 1100 : 700);
         } else if (ev.t === 'envido' || ev.t === 'flor') {
           log(`+${ev.points} de ${ev.t} para ${who(ev.winner)}`, 'pts');
           render(m);
@@ -287,20 +394,21 @@
       const m = S.match;
       if (h.points) log(`+${h.points} para ${who(h.winner)} por la mano`, 'pts');
       bump(h.winner);
-      say(OPP, pickOne(h.winner === OPP ? S.persona.say.winHand : S.persona.say.loseHand), 1600);
+      say(1, pickOne(h.winner === 1 ? personaOf(1).say.winHand : personaOf(1).say.loseHand), 1600);
       render(m, true);
       if (!settings.summary) { await sleep(1700); return; }
       return new Promise((res) => {
+        const them = isTeamGame() ? 'Los rivales' : oppName();
         const reasons = {
-          cards: (w) => (w === ME ? 'Ganaste con las cartas.' : `${oppName()} ganó con las cartas.`),
-          noquiero: (w) => (w === ME ? `${oppName()} no quiso.` : 'No quisiste.'),
-          mazo: (w) => (w === ME ? `${oppName()} se fue al mazo.` : 'Te fuiste al mazo.')
+          cards: (w) => (w === ME ? 'Ganaron las cartas de tu lado.' : `${them} ganaron con las cartas.`),
+          noquiero: (w) => (w === ME ? `${them} no quisieron.` : 'Tu lado no quiso.'),
+          mazo: (w) => (w === ME ? `${them} se fueron al mazo.` : 'Tu lado se fue al mazo.')
         };
-        $('ov-title').textContent = h.winner === ME ? `¡Mano para vos! +${h.points}` : `Mano para ${oppName()} · +${h.points}`;
+        $('ov-title').textContent = h.winner === ME ? `¡Mano para ${isTeamGame() ? 'tu equipo' : 'vos'}! +${h.points}` : `Mano para ${them} · +${h.points}`;
         const lines = [reasons[h.endReason](h.winner)];
         if (h.florResult) lines.push(`Flor: +${h.florResult.points} para ${who(h.florResult.winner)}.`);
         if (h.envResult) lines.push(`Envido: +${h.envResult.points} para ${who(h.envResult.winner)}.`);
-        lines.push(`Envido de cada uno: vos ${h.envPoints[ME]}, ${oppName()} ${h.envPoints[OPP]}.`);
+        if (!isTeamGame()) lines.push(`Envido de cada uno: vos ${h.envPoints[ME]}, ${oppName()} ${h.envPoints[OPP]}.`);
         $('ov-detail').innerHTML = lines.join('<br>');
         $('hand-overlay').classList.remove('hidden');
         const btn = $('btn-next');
@@ -315,6 +423,19 @@
       await sleep(900);
       if (m !== S.match) return;
       const won = winner === ME;
+      if (S.mode === 'team') {
+        const ts = store.get('truco.teamStats', { w: 0, l: 0 });
+        if (won) ts.w++; else ts.l++;
+        store.set('truco.teamStats', ts);
+        $('btn-next-rival').classList.add('hidden');
+        $('modal-avatar').textContent = won ? '🏆' : S.team.rivals.map((p) => p.avatar).join('');
+        $('modal-title').textContent = won ? '¡Ganó tu equipo!' : 'Ganaron los rivales';
+        $('modal-quote').textContent = '“' + pickOne(won ? S.team.rivals[0].say.loseGame : S.team.rivals[0].say.winGame) + '”';
+        $('modal-score').textContent = `Nosotros ${m.scores[0]} — ${m.scores[1]} Ellos · En equipo llevás ${ts.w} ganados y ${ts.l} perdidos`;
+        $('modal').classList.remove('hidden');
+        $('btn-rematch').focus();
+        return;
+      }
       const stats = store.get('truco.stats', {});
       const st = stats[S.persona.id] || { w: 0, l: 0 };
       if (won) st.w++; else st.l++;
@@ -339,7 +460,7 @@
   };
 
   function personaLine(ev) {
-    const s = S.persona.say;
+    const s = personaOf(ev.p).say;
     let key = null;
     if (ev.call === 'truco') key = ev.to === 2 ? 'truco' : ev.to === 3 ? 'retruco' : 'vale4';
     else if (ev.call) key = ev.call;
@@ -379,7 +500,8 @@
   /* ---------- Dibujo ---------- */
   const bubbleTimers = {};
   function say(p, text, ms) {
-    const el = $(p === ME ? 'me-bubble' : 'opp-bubble');
+    const el = $(p === ME ? 'me-bubble' : isTeamGame() ? 'seat-bubble-' + p : 'opp-bubble');
+    if (!el) return;
     el.textContent = text;
     el.classList.add('show');
     clearTimeout(bubbleTimers[p]);
@@ -433,9 +555,10 @@
   }
 
   function statusText(h, legal) {
-    const p = oppName();
     if (h.over) return '';
-    if (!legal) return `${p} está pensando…`;
+    const actor = E.actorOf(h);
+    if (!legal) return isTeamGame() && actor % 2 === 0 ? `Tu compañero ${nameOf(actor)} está pensando…` : `${nameOf(actor)} está pensando…`;
+    const p = nameOf(h.florPending ? h.florPending.caller : h.envPending ? h.envCaller : h.trucoPending ? h.trucoPending.caller : 1);
     if (legal.flor) return '¡Tenés flor! Cantala.';
     if (legal.kind === 'flor') {
       const st = h.florPending.stage;
@@ -452,8 +575,43 @@
     if (!h) return;
     const legal = myLegal();
 
-    $('top-score').innerHTML = `<span>Vos <b>${m.scores[ME]}</b></span><span class="sep">·</span><span><b>${m.scores[OPP]}</b> ${p.name}</span>`;
+    const team = m.seats.length > 2;
+    const usName = team ? 'Nosotros' : 'Vos', themName = team ? 'Ellos' : p.name;
+    $('top-score').innerHTML = `<span>${usName} <b>${m.scores[ME]}</b></span><span class="sep">·</span><span><b>${m.scores[OPP]}</b> ${themName}</span>`;
+    if (team) renderTeamTable(m, h, reveal);
+    else renderDuelTable(m, h, reveal);
+    renderCommon(m, h, legal, usName, themName);
+  }
 
+  function renderTeamTable(m, h, reveal) {
+    const n = h.n;
+    const actor = h.over ? -1 : E.actorOf(h);
+    for (let q = 1; q < n; q++) {
+      const seat = document.querySelector(`.seat[data-seat="${q}"]`);
+      if (!seat) continue;
+      seat.classList.toggle('acting', q === actor);
+      seat.classList.toggle('mano', q === h.mano);
+      const k = h.cards[q].length;
+      $('seat-cards-' + q).innerHTML = h.cards[q].map((c, i) => `<div class="card" style="${fan(i, k, -8)}">${reveal || h.over ? cardSVG(c) : backSVG()}</div>`).join('');
+    }
+    // baza en juego (o la última, hasta que se tire la primera carta de la siguiente)
+    const playing = h.trickCards.some(Boolean);
+    const last = h.trickLog[h.trickLog.length - 1];
+    const cards = playing || !last ? h.trickCards : last.cards;
+    const winSeat = !playing && last ? last.seat : null;
+    const pos = POS[n];
+    $('tring').innerHTML = cards.map((c, q) => (c ? `<div class="tcard at-${q === 0 ? 'bottom' : pos[q]} ${winSeat === q ? 'win' : ''} ${!playing && last && last.r === 'p' ? 'parda' : ''}"><div class="card${c.id === S.fresh ? ' fresh' : ''}">${cardSVG(c)}</div></div>` : '')).join('');
+    $('tsum').innerHTML = [0, 1, 2].map((i) => {
+      const r = h.results[i];
+      const txt = r === undefined ? (i === h.trick && !h.over ? 'en juego' : '—') : r === 'p' ? 'parda' : r === 0 ? 'nosotros' : 'ellos';
+      return `<span class="tchip ${r === undefined ? '' : r === 'p' ? 'r-parda' : r === 0 ? 'r-me' : 'r-opp'}"><em>${['1ra', '2da', '3ra'][i]}</em>${txt}</span>`;
+    }).join('');
+    const fresh = S.fresh;
+    if (fresh) setTimeout(() => { if (S.fresh === fresh) S.fresh = null; }, 350);
+  }
+
+  function renderDuelTable(m, h, reveal) {
+    const p = S.persona;
     // Mano del rival
     const showOpp = reveal || h.over;
     const n = h.cards[OPP].length;
@@ -476,7 +634,9 @@
     $('tricks').innerHTML = tricks;
     const fresh = S.fresh;
     if (fresh) setTimeout(() => { if (S.fresh === fresh) S.fresh = null; }, 350);
+  }
 
+  function renderCommon(m, h, legal, usName, themName) {
     // Estado
     const st = $('status');
     st.textContent = statusText(h, legal);
@@ -505,7 +665,7 @@
 
     // Datos de la mano
     const chips = [
-      ['Es mano', h.mano === ME ? 'vos' : p.name],
+      ['Es mano', h.mano === ME ? 'vos' : nameOf(h.mano)],
       ['La mano vale', h.trucoLevel + (h.trucoLevel > 1 ? ' · ' + E.TRUCO_NAMES[h.trucoLevel] : '')]
     ];
     if (settings.showEnv) chips.push([h.hasFlor[ME] ? 'Tu flor' : 'Tu envido', h.hasFlor[ME] ? h.florPts[ME] : h.envPoints[ME]]);
@@ -519,7 +679,7 @@
       <div class="sb-num">${m.scores[pl]}</div>
       <div class="sb-sub">${m.scores[pl] < m.target / 2 ? 'en las malas' : 'en las buenas'}</div>
       ${matchesSVG(m.scores[pl], m.target)}</div>`;
-    $('scoreboard').innerHTML = `<div class="board-title">Tanteador · a ${m.target}</div><div class="board-cols">${col(ME, 'Vos')}${col(OPP, p.name)}</div>`;
+    $('scoreboard').innerHTML = `<div class="board-title">Tanteador · a ${m.target}</div><div class="board-cols">${col(ME, usName)}${col(OPP, themName)}</div>`;
   }
 
   /* ---------- PWA: instalación y modo sin conexión ---------- */

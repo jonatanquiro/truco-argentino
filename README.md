@@ -8,25 +8,17 @@ Se puede **instalar como app (PWA)** y jugar **sin conexión**: en el celu, abr�
 
 ## Modos
 
-- **Carrera:** 16 rivales en orden, del almacén del barrio a Mandinga. Ganale a cada uno para desbloquear al siguiente.
-- **Partida libre:** cualquier rival, filtrando por categoría.
+- **Carrera:** recorrés las 24 provincias, de la Ciudad de Buenos Aires a Tierra del Fuego, con 3 rivales en cada una (72 en total) y la dificultad subiendo en el camino. Ganale a cada uno para desbloquear al siguiente. El último de cada provincia con 👑 es su campeón.
+- **Partida libre:** cualquier rival, filtrando por región o sólo los campeones.
 - **Partida rápida:** un rival al azar cerca de tu nivel, a 15 puntos.
-- **Multijugador:** próximamente.
+- **Por equipos:** 2 contra 2 o 3 contra 3. Elegís a tus compañeros y a los rivales entre todos los personajes (o los mezclás al azar); todos menos vos los juega la máquina.
+- **Online:** próximamente.
 
 En **Opciones** elegís el paño (6 colores), el dorso y el estilo de las cartas (clásica, antigua, moderna, noche), los puntos, con o sin flor, la velocidad de la máquina y si querés un resumen al terminar cada mano.
 
 ## Los rivales
 
-| Nivel | Categoría | Rival |
-|---|---|---|
-| 1–3 | Principiante | Abuela Coca · Lucho · Sofi |
-| 4–6 | Intermedio | Rulo · Marta · Doña Pocha |
-| 7–9 | Avanzado | El Tano Ferrari · El Negro Benítez · Don Anselmo |
-| 10–12 | Experto | Chiche · La Turca Yamila · La Gringa Bauer |
-| 13–15 | Maestro | El Profe Gutiérrez · El Pibe Maravilla · El Gaucho Rivero |
-| 16 | Leyenda | Mandinga |
-
-Cada rival tiene un nivel y un estilo (mentiroso, prudente, envidero, agresivo). Los parámetros de juego salen de esos dos datos (`js/personas.js`), así que sumar un rival nuevo es agregar una entrada con su nivel, estilo, avatar y frases.
+Hay 16 personajes con historia propia (Abuela Coca, Lucho, Marta, El Tano Ferrari, Don Anselmo, Mandinga…), cada uno campeón de su provincia, y el resto se arma con variaciones: nombre, ciudad, oficio y estilo (mentiroso, prudente, envidero, agresivo o equilibrado). El nivel sale del lugar en la carrera. Está todo en `js/personas.js`.
 
 La máquina no hace trampa: sólo usa lo que vería un jugador de verdad (sus cartas, las que ya salieron, los cantos y los tantos que mostraste). Para decidir imagina muchas manos posibles tuyas, les da más peso a las que encajan con lo que hiciste ("cantó truco: algo tiene", "no quiso el envido: tiene poco") y las resuelve. Los niveles altos imaginan más manos, leen más fino, se equivocan menos y, desde el nivel 4, aprenden durante el partido cuánto mentís y cuánto te achicás.
 
@@ -37,6 +29,7 @@ La máquina no hace trampa: sólo usa lo que vería un jugador de verdad (sus ca
 - Flor (se puede desactivar): obligatoria, anula el envido; contraflor, contraflor al resto y con flor me achico.
 - Truco, retruco y vale cuatro; sólo sube quien tiene el quiero.
 - Pardas, alternancia de la mano, irse al mazo (en la primera, sin envido jugado, son 2 puntos).
+- Por equipos: los asientos alternan equipos, la mano pasa al de la derecha, el envido lo dicen todos desde la mano (gana el mejor de cada equipo; el empate, el más cercano a la mano) y responde el rival que sigue en la ronda. Irse al mazo es abandonar la mano por todo el equipo.
 
 ## Correrlo en tu compu
 
@@ -61,6 +54,6 @@ y entrá a http://localhost:8000 (el modo offline necesita servirlo por http/htt
 
 Si cambiás archivos, subí el número de `VERSION` en `sw.js` para que las apps instaladas se actualicen.
 
-## Multijugador (preparado, todavía no está)
+## Online (preparado, todavía no está)
 
-El motor de reglas (`engine.js`) no sabe quién juega: sólo recibe acciones en objetos planos (JSON) y devuelve eventos. El partido (`match.js`) le pregunta a cada asiento qué hace, así que jugar contra otra persona es agregar un `RemoteSeat` que mande las opciones por la red y espere la respuesta. `Engine.newHand` acepta un mazo ya mezclado (`opts.deck`) para que el anfitrión reparta y los demás reproduzcan la misma mano. Falta elegir el transporte (WebRTC entre navegadores, o un servidor chico con WebSockets) y cómo se arma la sala.
+El motor de reglas (`engine.js`) juega con 2, 4 o 6 asientos y no sabe quién juega: sólo recibe acciones en objetos planos (JSON) y devuelve eventos. El partido (`match.js`) le pregunta a cada asiento qué hace, así que jugar contra otra persona es agregar un `RemoteSeat` que mande las opciones por la red y espere la respuesta. `Engine.newHand` acepta un mazo ya mezclado (`opts.deck`) para que el anfitrión reparta y los demás reproduzcan la misma mano. Falta elegir el transporte (WebRTC entre navegadores, o un servidor chico con WebSockets) y cómo se arma la sala.
