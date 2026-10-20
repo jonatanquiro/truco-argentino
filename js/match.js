@@ -22,6 +22,8 @@
       this.pending = null;   // { seat, legal } mientras se espera una decisión
       this.stopped = false;
       this.winner = null;
+      this.handNo = 0;
+      this.hints = {};      // pedidos entre compañeros: { equipo: { type, hand, trick } }
     }
 
     stop() { this.stopped = true; }
@@ -29,6 +31,8 @@
     async run() {
       while (!this.stopped) {
         this.hand = E.newHand(this.mano, { flor: this.flor, n: this.seats.length });
+        this.handNo++;
+        this.hand.no = this.handNo;
         this.view.render(this);
         const ok = await this.playHand();
         if (!ok) return;
@@ -53,7 +57,7 @@
         const seat = E.actorOf(h);
         const legal = E.legalActions(h, seat);
         this.pending = { seat, legal };
-        const decision = this.seats[seat].act(h, seat, legal, { scores: this.scores, target: this.target });
+        const decision = this.seats[seat].act(h, seat, legal, { scores: this.scores, target: this.target, hints: this.hints });
         this.view.render(this);
         const act = await decision;
         this.pending = null;

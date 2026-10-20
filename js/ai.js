@@ -442,6 +442,20 @@
     };
   }
 
+  // "Poné": jugá para ganar la baza. "Vení": dejámela a mí, tirá la más baja.
+  function hintedPlay(h, me, type) {
+    const sorted = h.cards[me].slice().sort((a, b) => rank(a) - rank(b));
+    if (type === 'veni') return { type: 'play', card: sorted[0] };
+    let top = -1, topTeam = null;
+    h.trickCards.forEach((c, q) => {
+      if (!c) return;
+      if (rank(c) > top) { top = rank(c); topTeam = q % 2; } else if (rank(c) === top && q % 2 !== topTeam) topTeam = 'p';
+    });
+    if (topTeam === me % 2) return { type: 'play', card: sorted[0] };
+    const beat = sorted.find((c) => rank(c) > top);
+    return { type: 'play', card: beat || sorted[sorted.length - 1] };
+  }
+
   function decide(h, me, legal, ctx) {
     const p = ctx.persona.ai;
     if (legal.flor) return { type: 'flor' };
@@ -457,7 +471,12 @@
     }
 
     if (legal.kind === 'truco') return decideTrucoResponse(h, me, legal, p, ctx, ev.hand());
-    if (legal.truco && decideTrucoCall(h, me, p, ctx, ev.hand())) return { type: 'truco' };
+    // lo que pidió el compañero (sólo vale en esta mano)
+    const hint = ctx.hints && ctx.hints[me % 2];
+    const live = hint && hint.hand === h.no;
+    if (legal.truco && live && hint.type === 'truco' && !h.trucoCalls[me]) return { type: 'truco' };
+    if (legal.truco && !(live && hint.type === 'nocantes') && decideTrucoCall(h, me, p, ctx, ev.hand())) return { type: 'truco' };
+    if (legal.play && live && hint.trick === h.trick && (hint.type === 'pone' || hint.type === 'veni')) return hintedPlay(h, me, hint.type);
     return choosePlay(h, me, p, ev.cards);
   }
 

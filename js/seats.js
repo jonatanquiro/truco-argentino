@@ -38,7 +38,7 @@
     }
     async act(h, seat, legal, ctx) {
       await sleep((legal.kind === 'turn' && !legal.flor ? 750 : 950) * this.speed());
-      return window.AI.decide(h, seat, legal, { persona: this.persona, scores: ctx.scores, target: ctx.target, memory: this.memory });
+      return window.AI.decide(h, seat, legal, { persona: this.persona, scores: ctx.scores, target: ctx.target, memory: this.memory, hints: ctx.hints });
     }
     // la lectura del humano sólo se hace mano a mano (en equipos hay varios a quienes leer)
     onHandEnd(h) { if (h.n === 2) window.AI.learn(this.memory, h); }

@@ -11,7 +11,7 @@ Se puede **instalar como app (PWA)** y jugar **sin conexión**: en el celu, abr�
 - **Carrera:** recorrés las 24 provincias, de la Ciudad de Buenos Aires a Tierra del Fuego, con 3 rivales en cada una (72 en total) y la dificultad subiendo en el camino. Ganale a cada uno para desbloquear al siguiente. El último de cada provincia con 👑 es su campeón.
 - **Partida libre:** cualquier rival, filtrando por región o sólo los campeones.
 - **Partida rápida:** un rival al azar cerca de tu nivel, a 15 puntos.
-- **Por equipos:** 2 contra 2 o 3 contra 3. Elegís a tus compañeros y a los rivales entre todos los personajes (o los mezclás al azar); todos menos vos los juega la máquina.
+- **Por equipos:** 2 contra 2 o 3 contra 3. Elegís a tus compañeros y a los rivales entre todos los personajes (o los mezclás al azar); todos menos vos los juega la máquina. Podés hablarle a tu equipo (*¡Poné!*, *¡Vení!*, *Cantá truco*, *No cantes*, *¿Envido?*, *¿Cómo venís?*) y tocar la foto de un compañero para ver sus cartas.
 - **Online:** próximamente.
 
 En **Opciones** elegís el paño (6 colores), el dorso y el estilo de las cartas (clásica, antigua, moderna, noche), los puntos, con o sin flor, la velocidad de la máquina y si querés un resumen al terminar cada mano.

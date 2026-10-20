@@ -332,7 +332,7 @@
     setTableMode(n);
     $('ring').innerHTML = personas.map((p, q) => (q === 0 ? '' : `
       <div class="seat pos-${POS[n][q]} ${q % 2 ? 'them' : 'us'}" data-seat="${q}" style="--accent:${p.color}">
-        <div class="seat-id"><span class="seat-avatar">${p.avatar}</span><span class="seat-text"><b>${p.name}</b><em>${q % 2 ? 'Rival' : 'Compañero'} · nivel ${p.level}</em></span></div>
+        <${q % 2 ? 'div' : 'button type="button" title="Ver sus cartas"'} class="seat-id" ${q % 2 ? '' : `data-peek="${q}"`}><span class="seat-avatar">${p.avatar}</span><span class="seat-text"><b>${p.name}</b><em>${q % 2 ? 'Rival' : 'Compañero · tocá para ver'}</em></span></${q % 2 ? 'div' : 'button'}>
         <div class="seat-cards" id="seat-cards-${q}"></div>
         <div class="bubble seat-bubble" id="seat-bubble-${q}"></div>
       </div>`)).join('');
@@ -350,6 +350,8 @@
     t.classList.toggle('team-mode', team);
     t.classList.toggle('six', n === 6);
     $('ring').classList.toggle('hidden', !team);
+    $('talk').classList.toggle('hidden', !team);
+    S.peek = {};
     $('team-center').classList.toggle('hidden', !team);
     document.querySelector('.opp-zone').classList.toggle('hidden', team);
     $('tricks').classList.toggle('hidden', team);
@@ -382,7 +384,8 @@
           render(m);
           await sleep(isTeamGame() ? 1100 : 700);
         } else if (ev.t === 'envido' || ev.t === 'flor') {
-          log(`+${ev.points} de ${ev.t} para ${who(ev.winner)}`, 'pts');
+          const what = ev.t === 'flor' ? 'Flor' : ev.accepted === false ? 'Envido no querido' : 'Envido';
+          log(`${what}: +${ev.points} para ${who(ev.winner)}`, 'pts');
           render(m);
           bump(ev.winner);
           await sleep(750);
@@ -392,7 +395,8 @@
 
     async handOver(h) {
       const m = S.match;
-      if (h.points) log(`+${h.points} para ${who(h.winner)} por la mano`, 'pts');
+      const why = h.endReason === 'noquiero' ? `${E.TRUCO_NAMES[h.trucoLevel + 1]} no querido` : h.endReason === 'mazo' ? 'Al mazo' : 'Mano';
+      if (h.points) log(`${why}: +${h.points} para ${who(h.winner)}`, 'pts');
       bump(h.winner);
       say(1, pickOne(h.winner === 1 ? personaOf(1).say.winHand : personaOf(1).say.loseHand), 1600);
       render(m, true);
@@ -468,6 +472,88 @@
     else if (ev.text === 'No quiero.') key = 'noquiero';
     else if (ev.text === 'Me voy al mazo.') key = 'mazo';
     return key && s[key] ? pickOne(s[key]) : ev.text;
+  }
+
+  /* ---------- Señas entre compañeros ---------- */
+  const TALK = {
+    pone: ['¡Poné!', ['Dale, pongo.', 'Ahí va.']],
+    veni: ['¡Vení!', ['Dale, te la dejo.', 'Listo, tiro baja.']],
+    truco: ['¡Cantá truco!', ['Cuando me toque, canto.', 'Dejá, que canto yo.']],
+    nocantes: ['No cantes truco.', ['Listo, no canto.', 'Ok, me quedo callado.']],
+    envido: ['¿Cuánto tenés de envido?', null],
+    como: ['¿Cómo venís?', null]
+  };
+  const strongName = (c) => {
+    const r = window.Cards.rank(c);
+    if (r === 14) return 'el ancho de espada';
+    if (r === 13) return 'el ancho de basto';
+    if (r === 12) return 'el siete de espada';
+    if (r === 11) return 'el siete de oro';
+    if (r === 10) return 'un tres';
+    if (r === 9) return 'un dos';
+    if (r === 8) return 'un ancho falso';
+    return null;
+  };
+  const joinY = (xs) => (xs.length > 1 ? xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1] : xs[0]);
+  function partnerAnswer(h, q, type) {
+    if (type === 'envido') {
+      if (h.hasFlor[q]) return `¡Tengo flor! De ${h.florPts[q]}.`;
+      const e = h.envPoints[q];
+      return e >= 27 ? `Tengo ${e}. ¡Cantá nomás!` : e >= 20 ? `Tengo ${e}.` : `Tengo ${e}, nada.`;
+    }
+    if (type === 'como') {
+      const good = h.cards[q].map(strongName).filter(Boolean);
+      return good.length ? `Tengo ${joinY(good)}.` : h.cards[q].length ? 'No tengo nada, poné vos.' : 'Ya no me quedan cartas.';
+    }
+    return pickOne(TALK[type][1]);
+  }
+  function talk(type) {
+    const m = S.match;
+    if (!m || !m.hand || m.hand.over || !S.isTeam) return;
+    const h = m.hand;
+    const [text] = TALK[type];
+    say(ME, text, 1600);
+    log(`Vos (a tu equipo): ${text}`, 'me');
+    if (['pone', 'veni', 'truco', 'nocantes'].includes(type)) m.hints[0] = { type, hand: h.no, trick: h.trick };
+    const mates = [];
+    for (let q = 2; q < h.n; q += 2) mates.push(q);
+    mates.forEach((q, i) => setTimeout(() => {
+      if (m !== S.match || m.hand !== h) return;
+      const ans = partnerAnswer(h, q, type);
+      say(q, ans, 2600);
+      log(`${nameOf(q)} (a vos): ${ans}`, 'mate');
+    }, 600 + i * 700));
+  }
+  $('talk').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-talk]');
+    if (b) talk(b.dataset.talk);
+  });
+  $('ring').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-peek]');
+    if (!b || !S.match) return;
+    const q = +b.dataset.peek;
+    S.peek[q] = !S.peek[q];
+    render(S.match);
+  });
+  // Cuando te toca jugar, un compañero que viene después puede avisarte
+  function partnerTip(m, h) {
+    const key = h.no + '-' + h.trick;
+    if (S.tipKey === key) return;
+    S.tipKey = key;
+    const leading = !h.trickCards.some(Boolean);
+    const after = [];
+    for (let q = 2; q < h.n; q += 2) if (!h.trickCards[q] && h.cards[q].length) after.push(q);
+    const best = (q) => Math.max(...h.cards[q].map(window.Cards.rank));
+    const strong = after.find((q) => best(q) >= 12);
+    let q = null, text = null;
+    if (strong !== undefined && Math.random() < 0.7) { q = strong; text = pickOne(['¡Vení! La tengo yo.', 'Dejámela a mí.', 'Tirá baja, que mato yo.']); }
+    else if (leading && after.length && after.every((x) => best(x) < 9) && Math.random() < 0.5) { q = after[0]; text = pickOne(['Poné, que no tengo nada.', 'Estoy pelado, jugá vos.']); }
+    if (q === null) return;
+    setTimeout(() => {
+      if (m !== S.match || m.hand !== h) return;
+      say(q, text, 2400);
+      log(`${nameOf(q)} (a vos): ${text}`, 'mate');
+    }, 350);
   }
 
   /* ---------- Entrada del jugador ---------- */
@@ -576,6 +662,7 @@
     const legal = myLegal();
 
     const team = m.seats.length > 2;
+    S.isTeam = team;
     const usName = team ? 'Nosotros' : 'Vos', themName = team ? 'Ellos' : p.name;
     $('top-score').innerHTML = `<span>${usName} <b>${m.scores[ME]}</b></span><span class="sep">·</span><span><b>${m.scores[OPP]}</b> ${themName}</span>`;
     if (team) renderTeamTable(m, h, reveal);
@@ -591,8 +678,10 @@
       if (!seat) continue;
       seat.classList.toggle('acting', q === actor);
       seat.classList.toggle('mano', q === h.mano);
+      const peek = q % 2 === 0 && S.peek && S.peek[q];
+      seat.classList.toggle('peek', !!peek);
       const k = h.cards[q].length;
-      $('seat-cards-' + q).innerHTML = h.cards[q].map((c, i) => `<div class="card" style="${fan(i, k, -8)}">${reveal || h.over ? cardSVG(c) : backSVG()}</div>`).join('');
+      $('seat-cards-' + q).innerHTML = h.cards[q].map((c, i) => `<div class="card" style="${fan(i, k, -8)}">${reveal || h.over || peek ? cardSVG(c) : backSVG()}</div>`).join('');
     }
     // baza en juego (o la última, hasta que se tire la primera carta de la siguiente)
     const playing = h.trickCards.some(Boolean);
@@ -637,6 +726,7 @@
   }
 
   function renderCommon(m, h, legal, usName, themName) {
+    if (S.isTeam && legal && legal.play) partnerTip(m, h);
     // Estado
     const st = $('status');
     st.textContent = statusText(h, legal);

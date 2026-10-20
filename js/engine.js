@@ -310,7 +310,7 @@
           const val = envAcceptedValue(h.envCalls, scores, target, w);
           scores[w] += val;
           h.envResult = { winner: w, points: val, accepted: true };
-          ev.push({ t: 'envido', winner: w, points: val });
+          ev.push({ t: 'envido', winner: w, points: val, accepted: true });
         } else if (h.trucoPending) {
           h.trucoLevel = h.trucoPending.to;
           h.trucoOwner = team(p);
@@ -334,7 +334,7 @@
           h.envDone = true;
           scores[team(h.envCaller)] += val;
           h.envResult = { winner: team(h.envCaller), points: val, accepted: false };
-          ev.push({ t: 'envido', winner: team(h.envCaller), points: val });
+          ev.push({ t: 'envido', winner: team(h.envCaller), points: val, accepted: false });
         } else if (h.trucoPending) {
           endHand(h, team(h.trucoPending.caller), h.trucoLevel, 'noquiero');
           h.trucoPending = null;
