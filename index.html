@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Truco Argentino</title>
+  <meta name="description" content="Truco argentino contra la máquina, con rivales de distintos niveles. Se juega sin conexión.">
+  <meta name="theme-color" content="#14432b">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Menú: elegir rival -->
+  <section id="menu" class="screen">
+    <header class="brand">
+      <div class="brand-cards" aria-hidden="true"><span></span><span></span><span></span></div>
+      <h1>Truco</h1>
+      <p class="tag">Argentino · mano a mano contra la máquina</p>
+    </header>
+
+    <div class="menu-options">
+      <div class="seg" role="radiogroup" aria-label="Puntos del partido">
+        <span class="seg-label">Partido a</span>
+        <button type="button" data-target="15" role="radio">15</button>
+        <button type="button" data-target="30" role="radio">30</button>
+        <span class="seg-label">puntos</span>
+      </div>
+      <button id="btn-install" class="btn ghost hidden" type="button">⬇ Instalar app</button>
+    </div>
+
+    <h2 class="menu-title">Elegí tu rival</h2>
+    <div id="personas" class="persona-grid"></div>
+
+    <details class="rules">
+      <summary>Cómo se juega</summary>
+      <div class="rules-body">
+        <p><b>Cartas:</b> mazo español de 40 (sin 8 ni 9). Cada uno recibe 3. Gana la mano quien gana 2 de las 3 bazas.</p>
+        <p><b>De mayor a menor:</b> 1 de espada · 1 de basto · 7 de espada · 7 de oro · los 3 · los 2 · 1 de copa y de oro · los 12 · los 11 · los 10 · 7 de copa y de basto · los 6 · los 5 · los 4.</p>
+        <p><b>Pardas:</b> si se empata la primera, gana quien gane la segunda. Si se empata una después, gana quien ganó la primera. Si todo es parda, gana el mano.</p>
+        <p><b>Envido</b> (sólo en la primera baza, antes de tirar tu carta): dos cartas del mismo palo suman 20 + sus valores (las figuras valen 0). Si no tenés dos del mismo palo, vale tu carta más alta. Envido 2 · Real envido 3 · Falta envido lo que le falta al que va ganando (si nadie llegó a las buenas, el partido). Si no te lo quieren, sumás lo anterior o 1. Empate: gana el mano.</p>
+        <p><b>Truco:</b> la mano vale 1. Truco 2 · Retruco 3 · Vale cuatro 4. Si no te quieren, sumás lo que valía antes. Sólo puede subir quien tiene el quiero. Si te cantan truco en la primera, todavía podés cantar envido: <i>el envido está primero</i>.</p>
+        <p><b>Al mazo:</b> abandonás la mano y el rival suma lo que valía. Se juega sin flor.</p>
+      </div>
+    </details>
+    <p class="foot">Funciona sin conexión. Instalala desde el menú del navegador o con el botón de arriba.</p>
+  </section>
+
+  <!-- Mesa -->
+  <section id="game" class="screen hidden">
+    <div class="topbar">
+      <button id="btn-back" class="btn ghost small" type="button">← Rivales</button>
+      <div class="top-score" id="top-score"></div>
+    </div>
+
+    <div class="layout">
+      <div class="table">
+        <div class="opp-zone">
+          <div class="opp-id">
+            <div class="avatar" id="opp-avatar"></div>
+            <div>
+              <div class="opp-name" id="opp-name"></div>
+              <div class="opp-level" id="opp-level"></div>
+            </div>
+          </div>
+          <div class="hand opp-hand" id="opp-hand"></div>
+          <div class="bubble opp" id="opp-bubble" aria-live="polite"></div>
+        </div>
+
+        <div class="center">
+          <div class="chips" id="chips"></div>
+          <div class="tricks" id="tricks"></div>
+          <div class="status" id="status" aria-live="polite"></div>
+        </div>
+
+        <div class="me-zone">
+          <div class="bubble me" id="me-bubble"></div>
+          <div class="hand my-hand" id="my-hand"></div>
+          <div class="actions" id="actions">
+            <div class="act-group">
+              <button class="btn act env" data-act="envido" type="button">Envido</button>
+              <button class="btn act env" data-act="real" type="button">Real envido</button>
+              <button class="btn act env" data-act="falta" type="button">Falta envido</button>
+            </div>
+            <div class="act-group">
+              <button class="btn act truco" data-act="truco" type="button">Truco</button>
+              <button class="btn act yes" data-act="quiero" type="button">Quiero</button>
+              <button class="btn act no" data-act="noquiero" type="button">No quiero</button>
+              <button class="btn act mazo" data-act="mazo" type="button">Al mazo</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="overlay hidden" id="hand-overlay">
+          <div class="overlay-card">
+            <div class="overlay-title" id="ov-title"></div>
+            <div class="overlay-detail" id="ov-detail"></div>
+            <button class="btn primary" id="btn-next" type="button">Siguiente mano</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="side">
+        <div class="scoreboard" id="scoreboard"></div>
+        <div class="log-wrap">
+          <div class="log-title">Lo que pasó</div>
+          <ol class="log" id="log"></ol>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Fin del partido -->
+  <div class="modal hidden" id="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <div class="modal-avatar" id="modal-avatar"></div>
+      <h2 id="modal-title"></h2>
+      <p class="modal-quote" id="modal-quote"></p>
+      <p class="modal-score" id="modal-score"></p>
+      <div class="modal-actions">
+        <button class="btn primary" id="btn-rematch" type="button">Revancha</button>
+        <button class="btn ghost" id="btn-menu" type="button">Elegir otro rival</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/cards.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/personas.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>
