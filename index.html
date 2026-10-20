@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Truco Argentino</title>
   <meta name="description" content="Truco argentino contra la máquina, con rivales de distintos niveles. Se juega sin conexión.">
-  <meta name="theme-color" content="#14432b">
+  <meta name="theme-color" content="#1a0f08">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
@@ -27,9 +27,12 @@
         <span class="seg-label">Partido a</span>
         <button type="button" data-target="15" role="radio">15</button>
         <button type="button" data-target="30" role="radio">30</button>
-        <span class="seg-label">puntos</span>
       </div>
-      <button id="btn-install" class="btn ghost hidden" type="button">⬇ Instalar app</button>
+      <div class="seg" role="radiogroup" aria-label="Flor">
+        <button type="button" data-flor="1" role="radio">Con flor</button>
+        <button type="button" data-flor="0" role="radio">Sin flor</button>
+      </div>
+      <button id="btn-install" class="btn ghost small hidden" type="button">⬇ Instalar app</button>
     </div>
 
     <h2 class="menu-title">Elegí tu rival</h2>
@@ -42,8 +45,9 @@
         <p><b>De mayor a menor:</b> 1 de espada · 1 de basto · 7 de espada · 7 de oro · los 3 · los 2 · 1 de copa y de oro · los 12 · los 11 · los 10 · 7 de copa y de basto · los 6 · los 5 · los 4.</p>
         <p><b>Pardas:</b> si se empata la primera, gana quien gane la segunda. Si se empata una después, gana quien ganó la primera. Si todo es parda, gana el mano.</p>
         <p><b>Envido</b> (sólo en la primera baza, antes de tirar tu carta): dos cartas del mismo palo suman 20 + sus valores (las figuras valen 0). Si no tenés dos del mismo palo, vale tu carta más alta. Envido 2 · Real envido 3 · Falta envido lo que le falta al que va ganando (si nadie llegó a las buenas, el partido). Si no te lo quieren, sumás lo anterior o 1. Empate: gana el mano.</p>
+        <p><b>Flor</b> (si se juega con flor): tres cartas del mismo palo. Es obligatorio cantarla antes de tirar tu primera carta y anula el envido. Si el otro no tiene, sumás 3. Si los dos tienen: <i>con flor me achico</i> (el que cantó suma 4), <i>contraflor</i> (6 al que tenga más; si no la quieren, 4) o <i>contraflor al resto</i> (como la falta envido). La flor vale 20 + las tres cartas.</p>
         <p><b>Truco:</b> la mano vale 1. Truco 2 · Retruco 3 · Vale cuatro 4. Si no te quieren, sumás lo que valía antes. Sólo puede subir quien tiene el quiero. Si te cantan truco en la primera, todavía podés cantar envido: <i>el envido está primero</i>.</p>
-        <p><b>Al mazo:</b> abandonás la mano y el rival suma lo que valía. Se juega sin flor.</p>
+        <p><b>Al mazo:</b> abandonás la mano y el rival suma lo que valía. Si te vas en la primera sin que se haya jugado el envido, suma 2.</p>
       </div>
     </details>
     <p class="foot">Funciona sin conexión. Instalala desde el menú del navegador o con el botón de arriba.</p>
@@ -51,12 +55,13 @@
 
   <!-- Mesa -->
   <section id="game" class="screen hidden">
-    <div class="topbar">
+    <header class="topbar">
       <button id="btn-back" class="btn ghost small" type="button">← Rivales</button>
+      <div class="top-title">Truco</div>
       <div class="top-score" id="top-score"></div>
-    </div>
+    </header>
 
-    <div class="layout">
+    <main class="layout">
       <div class="table">
         <div class="opp-zone">
           <div class="opp-id">
@@ -65,13 +70,12 @@
               <div class="opp-name" id="opp-name"></div>
               <div class="opp-level" id="opp-level"></div>
             </div>
+            <div class="bubble opp" id="opp-bubble" aria-live="polite"></div>
           </div>
           <div class="hand opp-hand" id="opp-hand"></div>
-          <div class="bubble opp" id="opp-bubble" aria-live="polite"></div>
         </div>
 
         <div class="center">
-          <div class="chips" id="chips"></div>
           <div class="tricks" id="tricks"></div>
           <div class="status" id="status" aria-live="polite"></div>
         </div>
@@ -81,6 +85,10 @@
           <div class="hand my-hand" id="my-hand"></div>
           <div class="actions" id="actions">
             <div class="act-group">
+              <button class="btn act flor" data-act="flor" type="button">¡Flor!</button>
+              <button class="btn act flor" data-act="contraflor" type="button">Contraflor</button>
+              <button class="btn act flor" data-act="resto" type="button">Contraflor al resto</button>
+              <button class="btn act env" data-act="achico" type="button">Con flor me achico</button>
               <button class="btn act env" data-act="envido" type="button">Envido</button>
               <button class="btn act env" data-act="real" type="button">Real envido</button>
               <button class="btn act env" data-act="falta" type="button">Falta envido</button>
@@ -104,13 +112,14 @@
       </div>
 
       <aside class="side">
-        <div class="scoreboard" id="scoreboard"></div>
+        <div class="board" id="scoreboard"></div>
+        <div class="info" id="chips"></div>
         <div class="log-wrap">
           <div class="log-title">Lo que pasó</div>
           <ol class="log" id="log"></ol>
         </div>
       </aside>
-    </div>
+    </main>
   </section>
 
   <!-- Fin del partido -->
@@ -131,6 +140,8 @@
   <script src="js/engine.js"></script>
   <script src="js/personas.js"></script>
   <script src="js/ai.js"></script>
+  <script src="js/seats.js"></script>
+  <script src="js/match.js"></script>
   <script src="js/ui.js"></script>
 </body>
 </html>

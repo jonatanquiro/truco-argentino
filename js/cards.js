@@ -61,6 +61,9 @@
     return best;
   }
 
+  const isFlor = (cards) => cards.length === 3 && cards[0].s === cards[1].s && cards[1].s === cards[2].s;
+  const florPoints = (cards) => 20 + cards.reduce((s, c) => s + envValue(c), 0);
+
   // Quién gana la mano según las bazas (0/1/'p'). null si todavía no está definida.
   function handWinner(r, mano) {
     if (r.length >= 2) {
@@ -135,5 +138,5 @@
     </svg>`;
   }
 
-  window.Cards = { SUITS, VALUES, makeDeck, shuffle, rank, compare, envidoPoints, handWinner, cardName, cardSVG, backSVG };
+  window.Cards = { SUITS, VALUES, makeDeck, shuffle, rank, compare, envidoPoints, isFlor, florPoints, handWinner, cardName, cardSVG, backSVG };
 })();

@@ -1,5 +1,5 @@
 /* Guarda todo el juego en caché para jugar sin conexión. Cambiá VERSION al publicar cambios. */
-const VERSION = 'truco-v1';
+const VERSION = 'truco-v2';
 const FILES = [
   './',
   'index.html',
@@ -8,6 +8,8 @@ const FILES = [
   'js/engine.js',
   'js/personas.js',
   'js/ai.js',
+  'js/seats.js',
+  'js/match.js',
   'js/ui.js',
   'manifest.webmanifest',
   'icons/icon.svg',

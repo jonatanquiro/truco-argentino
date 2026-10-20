@@ -1,8 +1,9 @@
-/* Interfaz y desarrollo del partido */
+/* Pantallas, mesa y entrada del jugador. El partido en sí está en match.js. */
 (function () {
   const { cardSVG, backSVG, cardName } = window.Cards;
   const E = window.Engine;
   const $ = (id) => document.getElementById(id);
+  const ME = 0, OPP = 1; // asiento de este dispositivo y del rival
 
   /* ---------- Guardado local (puede fallar en modo privado) ---------- */
   const store = {
@@ -13,132 +14,176 @@
   const S = {
     persona: null,
     target: store.get('truco.target', 30),
-    scores: [0, 0],
-    mano: 0,
-    hand: null,
-    memory: null,
-    token: 0,
-    humanResolve: null,
-    legal: null
+    flor: store.get('truco.flor', true),
+    match: null,
+    local: null,      // asiento LocalSeat de este dispositivo
+    fresh: null
   };
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  const oppName = () => S.persona.name;
+  const who = (p) => (p === ME ? 'vos' : oppName());
 
   /* ---------- Menú ---------- */
   function renderMenu() {
     const stats = store.get('truco.stats', {});
     $('personas').innerHTML = window.PERSONAS.map((p) => {
       const st = stats[p.id] || { w: 0, l: 0 };
-      const stars = '★'.repeat(p.level) + '<span class="off">' + '★'.repeat(5 - p.level) + '</span>';
+      const pips = Array.from({ length: 8 }, (_, i) => `<i class="${i < p.level ? 'on' : ''}"></i>`).join('');
       return `<button class="persona" type="button" data-id="${p.id}" style="--accent:${p.color}">
         <div class="persona-head">
           <div class="persona-avatar">${p.avatar}</div>
-          <div>
+          <div class="persona-titles">
             <div class="persona-name">${p.name}${st.w ? '<span class="badge">🏆 ' + st.w + '</span>' : ''}</div>
-            <div class="persona-level"><span class="stars">${stars}</span> · Nivel ${p.level} · ${p.levelName}</div>
+            <div class="persona-level">Nivel ${p.level} · ${p.levelName}</div>
+            <div class="pips" aria-hidden="true">${pips}</div>
           </div>
         </div>
         <p class="persona-desc">${p.desc}</p>
         <div class="persona-foot"><span>Ganaste ${st.w} · Perdiste ${st.l}</span><span class="play">Jugar</span></div>
       </button>`;
     }).join('');
-    document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-checked', String(+b.dataset.target === S.target)));
+    document.querySelectorAll('[data-target]').forEach((b) => b.setAttribute('aria-checked', String(+b.dataset.target === S.target)));
+    document.querySelectorAll('[data-flor]').forEach((b) => b.setAttribute('aria-checked', String((b.dataset.flor === '1') === S.flor)));
   }
 
   $('personas').addEventListener('click', (e) => {
     const b = e.target.closest('.persona');
     if (b) startMatch(window.PERSONAS.find((p) => p.id === b.dataset.id));
   });
-  document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-target]').forEach((b) => b.addEventListener('click', () => {
     S.target = +b.dataset.target;
     store.set('truco.target', S.target);
+    renderMenu();
+  }));
+  document.querySelectorAll('[data-flor]').forEach((b) => b.addEventListener('click', () => {
+    S.flor = b.dataset.flor === '1';
+    store.set('truco.flor', S.flor);
     renderMenu();
   }));
 
   function showScreen(id) {
     $('menu').classList.toggle('hidden', id !== 'menu');
     $('game').classList.toggle('hidden', id !== 'game');
+    document.body.classList.toggle('in-game', id === 'game');
     window.scrollTo(0, 0);
   }
 
-  $('btn-back').addEventListener('click', () => {
-    if (S.hand && !S.hand.over && (S.scores[0] || S.scores[1]) && !confirm('¿Abandonar el partido?')) return;
-    S.token++;
+  function stopMatch() {
+    if (S.match) S.match.stop();
+    S.match = null;
     $('modal').classList.add('hidden');
+    $('hand-overlay').classList.add('hidden');
+  }
+
+  $('btn-back').addEventListener('click', () => {
+    const m = S.match;
+    if (m && m.winner === null && (m.scores[0] || m.scores[1]) && !confirm('¿Abandonar el partido?')) return;
+    stopMatch();
     renderMenu();
     showScreen('menu');
   });
-  $('btn-menu').addEventListener('click', () => { S.token++; $('modal').classList.add('hidden'); renderMenu(); showScreen('menu'); });
-  $('btn-rematch').addEventListener('click', () => { $('modal').classList.add('hidden'); startMatch(S.persona); });
+  $('btn-menu').addEventListener('click', () => { stopMatch(); renderMenu(); showScreen('menu'); });
+  $('btn-rematch').addEventListener('click', () => startMatch(S.persona));
 
   /* ---------- Partido ---------- */
   function startMatch(persona) {
-    S.token++;
+    stopMatch();
     S.persona = persona;
-    S.scores = [0, 0];
-    S.mano = Math.random() < 0.5 ? 0 : 1;
-    S.memory = window.AI.newMemory();
+    S.local = new window.Seats.LocalSeat();
+    const seats = [S.local, new window.Seats.AISeat(persona)];
+    const m = new window.Match({ seats, target: S.target, flor: S.flor, view });
+    S.match = m;
     $('log').innerHTML = '';
     $('opp-avatar').textContent = persona.avatar;
-    $('opp-avatar').style.setProperty('--accent', persona.color);
+    document.querySelector('.table').style.setProperty('--accent', persona.color);
     $('opp-name').textContent = persona.name;
     $('opp-level').textContent = 'Nivel ' + persona.level + ' · ' + persona.levelName;
     showScreen('game');
-    log(`Partido a ${S.target} contra ${persona.name}.`, 'sep');
-    runMatch(S.token, persona);
+    log(`Partido a ${S.target}${S.flor ? ', con flor' : ', sin flor'}, contra ${persona.name}.`, 'sep');
+    say(OPP, pickOne(persona.say.greet), 2400);
+    m.run();
   }
 
-  async function runMatch(token, persona) {
-    say(1, pickOne(persona.say.greet), 2200);
-    while (token === S.token) {
-      S.hand = E.newHand(S.mano);
-      log(`— Mano nueva · es mano ${S.mano === 0 ? 'vos' : persona.name} —`, 'sep');
-      render();
-      await sleep(400);
-      const ok = await playHand(token);
-      if (!ok) return;
-      const h = S.hand;
-      if (h.endReason !== 'game') S.scores[h.winner] = Math.min(S.target, S.scores[h.winner] + h.points);
-      window.AI.learn(S.memory, h);
-      if (h.points) log(`+${h.points} para ${h.winner === 0 ? 'vos' : persona.name} por la mano`, 'pts');
-      bump(h.winner);
-      render();
-      const over = S.scores[0] >= S.target || S.scores[1] >= S.target;
-      if (over) { await sleep(900); endMatch(); return; }
-      if (h.endReason !== 'game') say(1, pickOne(h.winner === 1 ? persona.say.winHand : persona.say.loseHand), 1800);
-      await showHandSummary(h);
-      if (token !== S.token) return;
-      S.mano = 1 - S.mano;
-    }
-  }
+  const live = (m) => m === S.match && !m.stopped;
 
-  async function playHand(token) {
-    const h = S.hand;
-    while (!h.over) {
-      const actor = E.actorOf(h);
-      const legal = E.legalActions(h, actor);
-      let act;
-      if (actor === 0) {
-        S.legal = legal;
-        render();
-        act = await new Promise((res) => { S.humanResolve = res; });
-        S.humanResolve = null;
-        S.legal = null;
-      } else {
-        S.legal = null;
-        render();
-        await sleep(legal.kind === 'turn' ? 750 : 950);
-        if (token !== S.token) return false;
-        act = window.AI.decide(h, 1, legal, { persona: S.persona, scores: S.scores, target: S.target, memory: S.memory });
+  const view = {
+    render(m) { if (live(m)) render(m); },
+
+    async showEvents(events) {
+      const m = S.match;
+      for (const ev of events) {
+        if (!live(m)) return;
+        if (ev.t === 'say') {
+          const text = ev.p === OPP ? personaLine(ev) : ev.text;
+          say(ev.p, text, 1600);
+          log(ev.p === ME ? `Vos: ${ev.text}` : `${oppName()}: ${text}`, ev.p === ME ? 'me' : '');
+          render(m);
+          await sleep(ev.p === OPP ? 950 : 500);
+        } else if (ev.t === 'play') {
+          S.fresh = ev.card.id;
+          log(ev.p === ME ? `Tirás el ${cardName(ev.card)}` : `${oppName()} tira el ${cardName(ev.card)}`, 'play');
+          render(m);
+          await sleep(ev.p === OPP ? 380 : 180);
+        } else if (ev.t === 'trick') {
+          const n = ['Primera', 'Segunda', 'Tercera'][ev.trick];
+          log(ev.r === 'p' ? `${n}: parda` : `${n} para ${who(ev.r)}`);
+          render(m);
+          await sleep(700);
+        } else if (ev.t === 'envido' || ev.t === 'flor') {
+          log(`+${ev.points} de ${ev.t} para ${who(ev.winner)}`, 'pts');
+          render(m);
+          bump(ev.winner);
+          await sleep(750);
+        }
       }
-      if (token !== S.token) return false;
-      const events = E.apply(h, actor, act, S.scores, S.target);
-      await showEvents(events, token);
-      if (token !== S.token) return false;
+    },
+
+    handOver(h) {
+      const m = S.match;
+      if (h.points) log(`+${h.points} para ${who(h.winner)} por la mano`, 'pts');
+      bump(h.winner);
+      say(OPP, pickOne(h.winner === OPP ? S.persona.say.winHand : S.persona.say.loseHand), 1800);
+      return new Promise((res) => {
+        const reasons = {
+          cards: (w) => (w === ME ? 'Ganaste con las cartas.' : `${oppName()} ganó con las cartas.`),
+          noquiero: (w) => (w === ME ? `${oppName()} no quiso.` : 'No quisiste.'),
+          mazo: (w) => (w === ME ? `${oppName()} se fue al mazo.` : 'Te fuiste al mazo.')
+        };
+        $('ov-title').textContent = h.winner === ME ? `¡Mano para vos! +${h.points}` : `Mano para ${oppName()} · +${h.points}`;
+        const lines = [reasons[h.endReason](h.winner)];
+        if (h.florResult) lines.push(`Flor: +${h.florResult.points} para ${who(h.florResult.winner)}.`);
+        if (h.envResult) lines.push(`Envido: +${h.envResult.points} para ${who(h.envResult.winner)}.`);
+        lines.push(`Envido de cada uno: vos ${h.envPoints[ME]}, ${oppName()} ${h.envPoints[OPP]}.`);
+        $('ov-detail').innerHTML = lines.join('<br>');
+        $('hand-overlay').classList.remove('hidden');
+        render(m, true);
+        const btn = $('btn-next');
+        btn.focus();
+        btn.onclick = () => { $('hand-overlay').classList.add('hidden'); res(); };
+      });
+    },
+
+    async matchOver(winner) {
+      const m = S.match;
+      render(m, true);
+      await sleep(900);
+      if (m !== S.match) return;
+      const won = winner === ME;
+      const stats = store.get('truco.stats', {});
+      const st = stats[S.persona.id] || { w: 0, l: 0 };
+      if (won) st.w++; else st.l++;
+      stats[S.persona.id] = st;
+      store.set('truco.stats', stats);
+      $('modal-avatar').textContent = won ? '🏆' : S.persona.avatar;
+      $('modal-title').textContent = won ? '¡Ganaste el partido!' : `Ganó ${oppName()}`;
+      $('modal-quote').textContent = '“' + pickOne(won ? S.persona.say.loseGame : S.persona.say.winGame) + '”';
+      $('modal-score').textContent = `Vos ${m.scores[ME]} — ${m.scores[OPP]} ${oppName()}`;
+      $('modal').classList.remove('hidden');
+      $('btn-rematch').focus();
     }
-    return true;
-  }
+  };
 
   function personaLine(ev) {
     const s = S.persona.say;
@@ -151,89 +196,37 @@
     return key && s[key] ? pickOne(s[key]) : ev.text;
   }
 
-  async function showEvents(events, token) {
-    for (const ev of events) {
-      if (token !== S.token) return;
-      const who = (p) => (p === 0 ? 'Vos' : S.persona.name);
-      if (ev.t === 'say') {
-        const text = ev.p === 1 ? personaLine(ev) : ev.text;
-        say(ev.p, text, 1500);
-        log(`${who(ev.p)}: ${ev.p === 1 && text !== ev.text ? ev.text + ' — “' + text + '”' : ev.text}`);
-        render();
-        await sleep(ev.p === 1 ? 900 : 500);
-      } else if (ev.t === 'play') {
-        S.fresh = ev.card.id;
-        log(ev.p === 0 ? `Tirás el ${cardName(ev.card)}` : `${S.persona.name} tira el ${cardName(ev.card)}`);
-        render();
-        await sleep(ev.p === 1 ? 350 : 150);
-      } else if (ev.t === 'trick') {
-        const n = ['Primera', 'Segunda', 'Tercera'][ev.trick];
-        log(ev.r === 'p' ? `${n}: parda` : `${n} para ${ev.r === 0 ? 'vos' : S.persona.name}`);
-        render();
-        await sleep(650);
-      } else if (ev.t === 'envido') {
-        log(`+${ev.points} de envido para ${ev.winner === 0 ? 'vos' : S.persona.name}`, 'pts');
-        bump(ev.winner);
-        render();
-        await sleep(700);
-      }
-    }
-  }
-
-  function showHandSummary(h) {
-    return new Promise((res) => {
-      const reasons = {
-        cards: (w) => (w === 0 ? 'Ganaste la mano con las cartas.' : `${S.persona.name} ganó con las cartas.`),
-        noquiero: (w) => (w === 0 ? `${S.persona.name} no quiso.` : 'No quisiste.'),
-        mazo: (w) => (w === 0 ? `${S.persona.name} se fue al mazo.` : 'Te fuiste al mazo.')
-      };
-      $('ov-title').textContent = h.winner === 0 ? `¡Mano para vos! +${h.points}` : `Mano para ${S.persona.name} · +${h.points}`;
-      let detail = reasons[h.endReason](h.winner);
-      if (h.envResult) detail += `<br>Envido: +${h.envResult.points} para ${h.envResult.winner === 0 ? 'vos' : S.persona.name}.`;
-      detail += `<br>Tus puntos de envido eran ${h.envPoints[0]}; los de ${S.persona.name}, ${h.envPoints[1]}.`;
-      $('ov-detail').innerHTML = detail;
-      $('hand-overlay').classList.remove('hidden');
-      render(true);
-      const btn = $('btn-next');
-      btn.focus();
-      btn.onclick = () => { $('hand-overlay').classList.add('hidden'); res(); };
-    });
-  }
-
-  function endMatch() {
-    const won = S.scores[0] >= S.target;
-    const stats = store.get('truco.stats', {});
-    const st = stats[S.persona.id] || { w: 0, l: 0 };
-    if (won) st.w++; else st.l++;
-    stats[S.persona.id] = st;
-    store.set('truco.stats', stats);
-    $('modal-avatar').textContent = won ? '🏆' : S.persona.avatar;
-    $('modal-title').textContent = won ? '¡Ganaste el partido!' : `Ganó ${S.persona.name}`;
-    $('modal-quote').textContent = '“' + pickOne(won ? S.persona.say.loseGame : S.persona.say.winGame) + '”';
-    $('modal-score').textContent = `Vos ${S.scores[0]} — ${S.scores[1]} ${S.persona.name}`;
-    $('modal').classList.remove('hidden');
-    $('btn-rematch').focus();
-  }
-
   /* ---------- Entrada del jugador ---------- */
+  function myLegal() {
+    const m = S.match;
+    return m && m.pending && m.pending.seat === ME && S.local.waiting ? m.pending.legal : null;
+  }
+
   $('actions').addEventListener('click', (e) => {
     const b = e.target.closest('[data-act]');
-    if (!b || b.disabled || !S.humanResolve) return;
+    if (!b || !myLegal()) return;
     const a = b.dataset.act;
-    if (a === 'envido' || a === 'real' || a === 'falta') S.humanResolve({ type: 'envido', kind: a });
-    else S.humanResolve({ type: a });
+    S.local.submit(a === 'envido' || a === 'real' || a === 'falta' ? { type: 'envido', kind: a } : { type: a });
   });
   $('my-hand').addEventListener('click', (e) => {
     const b = e.target.closest('.card');
-    if (!b || !S.humanResolve || !S.legal || !S.legal.play) return;
-    const card = S.hand.cards[0].find((c) => c.id === b.dataset.id);
-    if (card) S.humanResolve({ type: 'play', card });
+    const legal = myLegal();
+    if (!b || !legal || !legal.play) return;
+    const card = S.match.hand.cards[ME].find((c) => c.id === b.dataset.id);
+    if (card) S.local.submit({ type: 'play', card });
+  });
+  document.addEventListener('keydown', (e) => {
+    const legal = myLegal();
+    if (!legal || !legal.play) return;
+    const i = ['1', '2', '3'].indexOf(e.key);
+    const c = S.match.hand.cards[ME][i];
+    if (c) S.local.submit({ type: 'play', card: c });
   });
 
   /* ---------- Dibujo ---------- */
   const bubbleTimers = {};
   function say(p, text, ms) {
-    const el = $(p === 0 ? 'me-bubble' : 'opp-bubble');
+    const el = $(p === ME ? 'me-bubble' : 'opp-bubble');
     el.textContent = text;
     el.classList.add('show');
     clearTimeout(bubbleTimers[p]);
@@ -257,50 +250,61 @@
     el.classList.add('bump');
   }
 
-  function cardEl(c, cls, extra) {
-    return `<button type="button" class="card ${cls || ''}" data-id="${c.id}" aria-label="${cardName(c)}" ${extra || ''}>${cardSVG(c)}</button>`;
-  }
-  const backEl = () => `<div class="card">${backSVG()}</div>`;
+  // Abanico: cada carta un poco girada
+  const fan = (i, n, deg) => {
+    const k = i - (n - 1) / 2;
+    return `--rot:${k * deg}deg;--lift:${Math.abs(k) * Math.abs(deg) * 0.9}px`;
+  };
 
-  // Fósforos: cuadraditos de 5 (cuatro lados y la diagonal), con la raya de las buenas al medio
+  // Fósforos: cuadraditos de 5 (cuatro lados y la diagonal); malas arriba, buenas abajo
   function matchesSVG(score, target) {
-    const groups = target / 5;
-    const g = 34, gap = 8, half = groups / 2;
-    const h = groups * (g + gap) + 14;
+    const groups = target / 5, perRow = 3;
+    const g = 30, gap = 10;
+    const rows = Math.ceil(groups / perRow);
+    const W = perRow * g + (perRow - 1) * gap, H = rows * g + (rows - 1) * (gap + 8);
     const sticks = [[0, 0, g, 0], [g, 0, g, g], [g, g, 0, g], [0, g, 0, 0], [0, 0, g, g]];
-    let out = `<svg viewBox="-6 -6 ${g + 12} ${h}" aria-label="${score} puntos">`;
+    let out = `<svg viewBox="-6 -6 ${W + 12} ${H + 12}" aria-label="${score} puntos">`;
     let left = score;
     for (let i = 0; i < groups; i++) {
-      const y = i * (g + gap) + (i >= half ? 14 : 0);
+      const x = (i % perRow) * (g + gap), y = Math.floor(i / perRow) * (g + gap + 8);
       for (let k = 0; k < 5; k++) {
         const [x1, y1, x2, y2] = sticks[k];
         const on = left > 0;
         if (on) left--;
-        out += `<line x1="${x1}" y1="${y + y1}" x2="${x2}" y2="${y + y2}" stroke="${on ? '#f1d9a6' : 'rgba(255,255,255,.1)'}" stroke-width="3.2" stroke-linecap="round"/>`;
-        if (on) out += `<circle cx="${x2}" cy="${y + y2}" r="3.4" fill="#c23a2b"/>`;
+        out += `<line x1="${x + x1}" y1="${y + y1}" x2="${x + x2}" y2="${y + y2}" stroke="${on ? '#f3e2bd' : 'rgba(255,255,255,.08)'}" stroke-width="3.4" stroke-linecap="round"/>`;
+        if (on) out += `<circle cx="${x + x2}" cy="${y + y2}" r="3.6" fill="#d2452f"/>`;
       }
     }
-    const dy = half * (g + gap) + 1;
-    out += `<line x1="-4" y1="${dy}" x2="${g + 4}" y2="${dy}" stroke="rgba(255,255,255,.45)" stroke-dasharray="3 3"/>`;
+    if (rows > 1) out += `<line x1="-4" y1="${g + gap / 2 + 4}" x2="${W + 4}" y2="${g + gap / 2 + 4}" stroke="rgba(255,255,255,.35)" stroke-dasharray="3 4"/>`;
     return out + '</svg>';
   }
 
-  function render(reveal) {
-    const h = S.hand;
+  function statusText(h, legal) {
+    const p = oppName();
+    if (h.over) return '';
+    if (!legal) return `${p} está pensando…`;
+    if (legal.flor) return '¡Tenés flor! Cantala.';
+    if (legal.kind === 'flor') {
+      const st = h.florPending.stage;
+      return st === 'flor' ? `${p} cantó flor y vos también tenés. ¿Qué hacés?` : `${p} cantó ${E.FLOR_NAMES[st].toLowerCase()}. ¿Querés?`;
+    }
+    if (legal.kind === 'envido') return `${p} cantó ${E.ENV_NAMES[h.envCalls[h.envCalls.length - 1]].toLowerCase()}. ¿Querés?`;
+    if (legal.kind === 'truco') return `${p} cantó ${E.TRUCO_NAMES[h.trucoPending.to].toLowerCase()}. ¿Querés?`;
+    return 'Te toca: tirá una carta o cantá.';
+  }
+
+  function render(m, reveal) {
+    const h = m.hand;
     const p = S.persona;
     if (!h) return;
-    const legal = S.legal;
-    const fresh = S.fresh;
-    if (fresh) setTimeout(() => { if (S.fresh === fresh) S.fresh = null; }, 320);
-    const myTurn = !!legal;
+    const legal = myLegal();
 
-    $('top-score').innerHTML = `Vos <b>${S.scores[0]}</b> · <b>${S.scores[1]}</b> ${p.name} <span style="opacity:.6">/ ${S.target}</span>`;
+    $('top-score').innerHTML = `<span>Vos <b>${m.scores[ME]}</b></span><span class="sep">·</span><span><b>${m.scores[OPP]}</b> ${p.name}</span>`;
 
     // Mano del rival
-    const oh = $('opp-hand');
     const showOpp = reveal || h.over;
-    oh.classList.toggle('reveal', !!showOpp);
-    oh.innerHTML = h.cards[1].map((c) => (showOpp ? `<div class="card">${cardSVG(c)}</div>` : backEl())).join('');
+    const n = h.cards[OPP].length;
+    $('opp-hand').innerHTML = h.cards[OPP].map((c, i) => `<div class="card" style="${fan(i, n, -7)}">${showOpp ? cardSVG(c) : backSVG()}</div>`).join('');
 
     // Bazas
     let tricks = '';
@@ -309,65 +313,61 @@
       const cls = (pl) => (r === undefined ? '' : r === 'p' ? 'parda' : r === pl ? 'win' : 'lose');
       const slot = (pl) => {
         const c = h.played[pl][i];
-        return `<div class="slot ${cls(pl)}">${c ? `<div class="card${c.id === S.fresh ? ' fresh' : ''}">${cardSVG(c)}</div>` : ''}</div>`;
+        return `<div class="slot ${pl === ME ? 'mine' : 'theirs'} ${cls(pl)}">${c ? `<div class="card${c.id === S.fresh ? ' fresh' : ''}">${cardSVG(c)}</div>` : ''}</div>`;
       };
-      const res = r === undefined ? '' : r === 'p' ? 'parda' : r === 0 ? 'tuya' : 'de ' + p.name.split(' ').pop();
-      tricks += `<div class="trick"><div class="trick-label">${['1ra', '2da', '3ra'][i]}</div>${slot(1)}${slot(0)}<div class="trick-res">${res}</div></div>`;
+      const current = r === undefined && i === h.trick && !h.over;
+      const res = r === undefined ? '' : r === 'p' ? 'parda' : r === ME ? 'tuya' : 'de ' + p.name.split(' ').pop();
+      const state = current ? 'current' : r === undefined ? '' : r === 'p' ? 'r-parda' : r === ME ? 'r-me' : 'r-opp';
+      tricks += `<div class="trick ${state}"><div class="trick-label">${['Primera', 'Segunda', 'Tercera'][i]}</div><div class="pair">${slot(OPP)}${slot(ME)}</div><div class="trick-res">${res}</div></div>`;
     }
     $('tricks').innerHTML = tricks;
-
-    // Fichas de estado
-    const chips = [`Mano: <b>${h.mano === 0 ? 'vos' : p.name}</b>`, `La mano vale <b>${h.trucoLevel}</b>`];
-    if (h.trucoLevel > 1) chips.push(`<b>${E.TRUCO_NAMES[h.trucoLevel]}</b> querido`);
-    if (h.envResult) chips.push(`Envido: <b>+${h.envResult.points}</b> ${h.envResult.winner === 0 ? 'vos' : p.name}`);
-    chips.push(`Tu envido: <b>${h.envPoints[0]}</b>`);
-    $('chips').innerHTML = chips.map((c) => `<span class="chip">${c}</span>`).join('');
+    const fresh = S.fresh;
+    if (fresh) setTimeout(() => { if (S.fresh === fresh) S.fresh = null; }, 350);
 
     // Estado
-    let status = '';
-    if (h.over) status = '';
-    else if (myTurn && legal.kind === 'envido') status = `${p.name} cantó ${E.ENV_NAMES[h.envCalls[h.envCalls.length - 1]].toLowerCase()}. ¿Querés?`;
-    else if (myTurn && legal.kind === 'truco') status = `${p.name} cantó ${E.TRUCO_NAMES[h.trucoPending.to].toLowerCase()}. ¿Querés?`;
-    else if (myTurn) status = 'Te toca. Tirá una carta o cantá.';
-    else status = `${p.name} está pensando…`;
-    $('status').textContent = status;
+    const st = $('status');
+    st.textContent = statusText(h, legal);
+    st.classList.toggle('mine', !!legal);
+    st.classList.toggle('empty', !st.textContent);
 
     // Mi mano
     const mh = $('my-hand');
-    mh.classList.toggle('waiting', !myTurn);
-    mh.innerHTML = h.cards[0].map((c) => cardEl(c, myTurn && legal.play ? 'playable' : '', myTurn && legal.play ? '' : 'tabindex="-1"')).join('');
+    const canPlay = !!(legal && legal.play);
+    mh.classList.toggle('waiting', !legal);
+    const mn = h.cards[ME].length;
+    mh.innerHTML = h.cards[ME].map((c, i) =>
+      `<button type="button" class="card ${canPlay ? 'playable' : ''}" data-id="${c.id}" aria-label="${cardName(c)}" style="${fan(i, mn, 6)}" ${canPlay ? '' : 'tabindex="-1"'}>${cardSVG(c)}</button>`).join('');
 
     // Botones
-    const btns = document.querySelectorAll('#actions [data-act]');
-    btns.forEach((b) => {
+    document.querySelectorAll('#actions [data-act]').forEach((b) => {
       const a = b.dataset.act;
-      let show = false;
-      if (myTurn) {
-        if (a === 'truco') show = !!legal.truco;
-        else show = !!legal[a];
-      }
+      const show = !!(legal && (a === 'truco' ? legal.truco : legal[a]));
       b.classList.toggle('hidden', !show);
       if (a === 'truco' && show) {
         const name = E.TRUCO_NAMES[legal.truco];
         b.textContent = legal.kind === 'truco' ? 'Quiero ' + name.toLowerCase() : name;
       }
     });
+    $('actions').classList.toggle('idle', !legal);
+
+    // Datos de la mano
+    const chips = [
+      ['Es mano', h.mano === ME ? 'vos' : p.name],
+      ['La mano vale', h.trucoLevel + (h.trucoLevel > 1 ? ' · ' + E.TRUCO_NAMES[h.trucoLevel] : '')],
+      [h.hasFlor[ME] ? 'Tu flor' : 'Tu envido', h.hasFlor[ME] ? h.florPts[ME] : h.envPoints[ME]]
+    ];
+    if (h.florResult) chips.push(['Flor', `+${h.florResult.points} ${who(h.florResult.winner)}`]);
+    if (h.envResult) chips.push(['Envido', `+${h.envResult.points} ${who(h.envResult.winner)}`]);
+    $('chips').innerHTML = chips.map(([k, v]) => `<div class="chip"><span>${k}</span><b>${v}</b></div>`).join('');
 
     // Tanteador
     const col = (pl, name) => `<div class="sb-col" data-p="${pl}">
       <div class="sb-name">${name}</div>
-      <div class="sb-num">${S.scores[pl]}</div>
-      <div class="sb-sub">${S.scores[pl] < S.target / 2 ? 'en las malas' : 'en las buenas'}</div>
-      ${matchesSVG(S.scores[pl], S.target)}</div>`;
-    $('scoreboard').innerHTML = col(0, 'Vos') + col(1, p.name);
+      <div class="sb-num">${m.scores[pl]}</div>
+      <div class="sb-sub">${m.scores[pl] < m.target / 2 ? 'en las malas' : 'en las buenas'}</div>
+      ${matchesSVG(m.scores[pl], m.target)}</div>`;
+    $('scoreboard').innerHTML = `<div class="board-title">Tanteador · a ${m.target}</div><div class="board-cols">${col(ME, 'Vos')}${col(OPP, p.name)}</div>`;
   }
-
-  /* ---------- Teclado: 1-3 tiran carta ---------- */
-  document.addEventListener('keydown', (e) => {
-    if (!S.humanResolve || !S.legal || !S.legal.play) return;
-    const i = ['1', '2', '3'].indexOf(e.key);
-    if (i >= 0 && S.hand.cards[0][i]) S.humanResolve({ type: 'play', card: S.hand.cards[0][i] });
-  });
 
   /* ---------- PWA: instalación y modo sin conexión ---------- */
   let installEvt = null;
