@@ -629,3 +629,7 @@ button.seat-id:hover { box-shadow: 0 0 0 2px rgba(232, 179, 58, .7); }
   .btn.talk-btn { padding: 4px 8px; font-size: 12px; }
   .seat.peek .seat-cards { --w: 32px; min-height: 48px; }
 }
+.talk.asking .talk-btn[data-talk="pone"], .talk.asking .talk-btn[data-talk="veni"] {
+  background: var(--gold); color: #2b1a05; box-shadow: 0 0 0 3px rgba(232, 179, 58, .4); animation: pulse 1s ease-in-out infinite;
+}
+@keyframes pulse { 50% { transform: scale(1.08); } }

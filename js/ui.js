@@ -273,6 +273,8 @@
 
   /* ---------- Salir de la mesa ---------- */
   function stopMatch() {
+    if (S.asking) { S.asking.resolve(false); S.asking = null; $('talk').classList.remove('asking'); }
+    if (S.consult) { S.consult.resolve(null); S.consult = null; }
     if (S.match) S.match.stop();
     S.match = null;
     $('modal').classList.add('hidden');
@@ -325,7 +327,7 @@
     const n = (mates.length + 1) * 2;
     const personas = [null];
     for (let q = 1; q < n; q++) personas.push(q % 2 ? rivals[(q - 1) / 2] : mates[q / 2 - 1]);
-    const seats = personas.map((p, q) => (q === 0 ? S.local : new window.Seats.AISeat(p, () => settings.speed)));
+    const seats = personas.map((p, q) => (q === 0 ? S.local : new window.Seats.AISeat(p, () => settings.speed, q % 2 === 0 ? askPartner : null, q % 2 === 0 ? consultPartner : null)));
     const m = new window.Match({ seats, target: settings.target, flor: settings.flor, view });
     m.personas = personas;
     S.match = m;
@@ -515,6 +517,20 @@
     say(ME, text, 1600);
     log(`Vos (a tu equipo): ${text}`, 'me');
     if (['pone', 'veni', 'truco', 'nocantes'].includes(type)) m.hints[0] = { type, hand: h.no, trick: h.trick };
+    // si un compañero te estaba preguntando "¿Pongo o vengo?", contesta sólo él y juega
+    if (S.asking && (type === 'pone' || type === 'veni')) {
+      const a = S.asking;
+      S.asking = null;
+      $('talk').classList.remove('asking');
+      setTimeout(() => {
+        if (m !== S.match) return;
+        const ans = pickOne(TALK[type][1]);
+        say(a.q, ans, 1800);
+        log(`${nameOf(a.q)} (a vos): ${ans}`, 'mate');
+        a.resolve(true);
+      }, 300);
+      return;
+    }
     const mates = [];
     for (let q = 2; q < h.n; q += 2) mates.push(q);
     mates.forEach((q, i) => setTimeout(() => {
@@ -524,6 +540,43 @@
       log(`${nameOf(q)} (a vos): ${ans}`, 'mate');
     }, 600 + i * 700));
   }
+  /*
+   * Antes de tirar, un compañero de la máquina te pregunta "¿Pongo o vengo?" si todavía no jugaste
+   * en esta baza y su carta puede cambiar algo. Te espera unos segundos; si no contestás, decide solo.
+   */
+  function askPartner(h, q) {
+    const m = S.match;
+    if (!m || m.hand !== h || h.over || h.trickCards[0] || h.cards[q].length < 2) return Promise.resolve(false);
+    const hint = m.hints[0];
+    if (hint && hint.hand === h.no && hint.trick === h.trick && (hint.type === 'pone' || hint.type === 'veni')) return Promise.resolve(false);
+    let top = -1, topTeam = null;
+    h.trickCards.forEach((c, x) => {
+      if (!c) return;
+      const rk = window.Cards.rank(c);
+      if (rk > top) { top = rk; topTeam = x % 2; } else if (rk === top && x % 2 !== topTeam) topTeam = 'p';
+    });
+    const best = Math.max(...h.cards[q].map(window.Cards.rank));
+    if (topTeam === 0 || (top >= 0 && best <= top)) return Promise.resolve(false); // ya ganamos o no puede ganar: no hay nada que preguntar
+    return new Promise((resolve) => {
+      const text = pickOne(['¿Pongo o vengo?', '¿Pongo o venís vos?', '¿Qué hago, pongo o vengo?']);
+      say(q, text, 7000);
+      log(`${nameOf(q)} (a vos): ${text}`, 'mate');
+      const timer = setTimeout(() => {
+        if (!S.asking || S.asking.q !== q) return;
+        S.asking = null;
+        $('talk').classList.remove('asking');
+        if (m === S.match) {
+          say(q, 'Bueno, juego yo.', 1500);
+          render(m);
+        }
+        resolve(false);
+      }, 6500);
+      S.asking = { q, resolve: (v) => { clearTimeout(timer); resolve(v); } };
+      $('talk').classList.add('asking');
+      render(m);
+    });
+  }
+
   $('talk').addEventListener('click', (e) => {
     const b = e.target.closest('[data-talk]');
     if (b) talk(b.dataset.talk);
@@ -546,9 +599,12 @@
     const best = (q) => Math.max(...h.cards[q].map(window.Cards.rank));
     const strong = after.find((q) => best(q) >= 12);
     let q = null, text = null;
-    if (strong !== undefined && Math.random() < 0.7) { q = strong; text = pickOne(['¡Vení! La tengo yo.', 'Dejámela a mí.', 'Tirá baja, que mato yo.']); }
-    else if (leading && after.length && after.every((x) => best(x) < 9) && Math.random() < 0.5) { q = after[0]; text = pickOne(['Poné, que no tengo nada.', 'Estoy pelado, jugá vos.']); }
+    let commit = null;
+    if (strong !== undefined && Math.random() < 0.7) { q = strong; commit = 'pone'; text = pickOne(['¡Vení! La tengo yo.', 'Dejámela a mí.', 'Tirá baja, que mato yo.']); }
+    else if (leading && after.length && after.every((x) => best(x) < 9) && Math.random() < 0.5) { q = after[0]; commit = 'veni'; text = pickOne(['Poné, que no tengo nada.', 'Estoy pelado, jugá vos.']); }
     if (q === null) return;
+    // lo que avisa, lo cumple: si dice que la tiene, sale a ganarla; si dice que no tiene, tira baja
+    m.hints[0] = { type: commit, hand: h.no, trick: h.trick, seat: q };
     setTimeout(() => {
       if (m !== S.match || m.hand !== h) return;
       say(q, text, 2400);
@@ -559,6 +615,7 @@
   /* ---------- Entrada del jugador ---------- */
   function myLegal() {
     const m = S.match;
+    if (S.consult) return S.consult.legal;
     return m && m.pending && m.pending.seat === ME && S.local.waiting ? m.pending.legal : null;
   }
 
@@ -566,8 +623,39 @@
     const b = e.target.closest('[data-act]');
     if (!b || !myLegal()) return;
     const a = b.dataset.act;
-    S.local.submit(a === 'envido' || a === 'real' || a === 'falta' ? { type: 'envido', kind: a } : { type: a });
+    const act = a === 'envido' || a === 'real' || a === 'falta' ? { type: 'envido', kind: a } : { type: a };
+    if (S.consult) { const c = S.consult; S.consult = null; c.resolve(act); return; }
+    S.local.submit(act);
   });
+
+  /*
+   * Si le cantan a un compañero de la máquina, no contesta solo: te dice qué haría y te muestra
+   * los botones para que decidas por el equipo. Si no contestás a tiempo, hace lo que pensaba.
+   */
+  const opinion = (act) => act.type === 'quiero' ? 'Yo quiero.'
+    : act.type === 'noquiero' ? 'Yo no quiero.'
+    : act.type === 'truco' ? 'Yo le subo.'
+    : act.type === 'envido' ? `Yo le cantaría ${E.ENV_NAMES[act.kind].toLowerCase()}.`
+    : act.type === 'contraflor' || act.type === 'resto' ? `Yo cantaría ${E.FLOR_NAMES[act.type].toLowerCase()}.`
+    : act.type === 'achico' ? 'Yo me achicaría.'
+    : act.type === 'mazo' ? 'Yo me iría al mazo.' : '';
+  function consultPartner(h, q, legal, own) {
+    const m = S.match;
+    if (!m || m.hand !== h || h.over) return Promise.resolve(null);
+    return new Promise((resolve) => {
+      const text = `¿Qué hacemos? ${opinion(own)}`;
+      say(q, text, 9000);
+      log(`${nameOf(q)} (a vos): ${text}`, 'mate');
+      const timer = setTimeout(() => {
+        if (!S.consult || S.consult.q !== q) return;
+        S.consult = null;
+        if (m === S.match) render(m);
+        resolve(null);
+      }, 12000);
+      S.consult = { q, legal, own, resolve: (a) => { clearTimeout(timer); resolve(a); } };
+      render(m);
+    });
+  }
   $('my-hand').addEventListener('click', (e) => {
     const b = e.target.closest('.card');
     const legal = myLegal();
@@ -643,6 +731,12 @@
   function statusText(h, legal) {
     if (h.over) return '';
     const actor = E.actorOf(h);
+    if (S.asking) return `${nameOf(S.asking.q)} te pregunta: ¿pone o viene? Contestá con ¡Poné! o ¡Vení!`;
+    if (S.consult) {
+      const c = S.consult;
+      const what = h.florPending ? E.FLOR_NAMES[h.florPending.stage] : h.envPending ? E.ENV_NAMES[h.envCalls[h.envCalls.length - 1]] : E.TRUCO_NAMES[h.trucoPending.to];
+      return `Le cantaron ${what.toLowerCase()} a ${nameOf(c.q)}. ${opinion(c.own)} ¿Qué hacemos?`;
+    }
     if (!legal) return isTeamGame() && actor % 2 === 0 ? `Tu compañero ${nameOf(actor)} está pensando…` : `${nameOf(actor)} está pensando…`;
     const p = nameOf(h.florPending ? h.florPending.caller : h.envPending ? h.envCaller : h.trucoPending ? h.trucoPending.caller : 1);
     if (legal.flor) return '¡Tenés flor! Cantala.';

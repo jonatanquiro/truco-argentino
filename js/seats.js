@@ -31,14 +31,27 @@
 
   // La máquina
   class AISeat {
-    constructor(persona, speed) {
+    // ask(h, seat): opcional; un compañero tuyo puede preguntarte antes de tirar ("¿Pongo o vengo?")
+    // consult(h, seat, legal, propia): opcional; te consulta antes de contestar un canto y devuelve tu decisión (o null)
+    constructor(persona, speed, ask, consult) {
       this.persona = persona;
       this.speed = speed || (() => 1);
+      this.ask = ask || null;
+      this.consult = consult || null;
       this.memory = window.AI.newMemory();
     }
     async act(h, seat, legal, ctx) {
       await sleep((legal.kind === 'turn' && !legal.flor ? 750 : 950) * this.speed());
-      return window.AI.decide(h, seat, legal, { persona: this.persona, scores: ctx.scores, target: ctx.target, memory: this.memory, hints: ctx.hints });
+      const think = () => window.AI.decide(h, seat, legal, { persona: this.persona, scores: ctx.scores, target: ctx.target, memory: this.memory, hints: ctx.hints });
+      const act = think();
+      // si le cantaron a él, te dice qué haría y decidís vos por el equipo
+      if (this.consult && !legal.flor && ['truco', 'envido', 'flor'].includes(legal.kind)) {
+        const yours = await this.consult(h, seat, legal, act);
+        return yours || act;
+      }
+      // si iba a tirar una carta, primero le pregunta al compañero (si corresponde) y vuelve a pensar con la respuesta
+      if (act.type === 'play' && this.ask && (await this.ask(h, seat))) return think();
+      return act;
     }
     // la lectura del humano sólo se hace mano a mano (en equipos hay varios a quienes leer)
     onHandEnd(h) { if (h.n === 2) window.AI.learn(this.memory, h); }
