@@ -128,11 +128,10 @@
     let body = '';
     if (k.modern) {
       // número grande arriba, palo grande abajo: se lee de un vistazo
-      const label = FIGURES[c.v] ? FIGURES[c.v].charAt(0) : c.v;
-      body += `<text x="12" y="44" font-size="38" font-weight="800" fill="${col}" font-family="${k.font}">${label}</text>`;
+      body += `<text x="10" y="44" font-size="${c.v >= 10 ? 34 : 38}" font-weight="800" fill="${col}" font-family="${k.font}">${c.v}</text>`;
       body += suitAt(c.s, 22, 60, 0.55);
       body += suitAt(c.s, 64, 108, c.v === 1 ? 1.75 : 1.45);
-      if (FIGURES[c.v]) body += `<text x="88" y="24" font-size="9" font-weight="700" fill="${col}" font-family="${k.font}" text-anchor="end" letter-spacing="1">${FIGURES[c.v]}</text>`;
+      if (FIGURES[c.v]) body += `<text x="10" y="143" font-size="9" font-weight="700" fill="${col}" font-family="${k.font}" letter-spacing="1">${FIGURES[c.v]}</text>`;
       return `<svg viewBox="0 0 100 150" class="card-svg" aria-hidden="true">
         <rect x="1.5" y="1.5" width="97" height="147" rx="11" fill="${k.paper}" stroke="${k.edge}" stroke-width="2"/>
         <rect x="1.5" y="132" width="97" height="16.5" rx="0" fill="${col}" opacity=".12"/>
