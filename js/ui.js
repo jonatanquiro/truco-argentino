@@ -38,7 +38,9 @@
   const pickOne = (arr) => arr[Math.floor(Math.random() * arr.length)];
   // Quién es quién en la mesa (asiento → personaje; el 0 sos vos)
   const isTeamGame = () => !!(S.match && S.match.seats.length > 2);
-  const personaOf = (seat) => (S.match && S.match.personas ? S.match.personas[seat] : S.persona);
+  const realSeat = (seat) => (S.match && S.match.duelMap && S.match.hand && S.match.hand.n === 2 ? S.match.duelMap[seat] : seat);
+  const personaOf = (seat) => (S.match && S.match.personas ? S.match.personas[realSeat(seat)] : S.persona);
+  const inDuel = () => !!(S.match && S.match.hand && S.match.hand.n === 2);
   const nameOf = (seat) => (seat === ME ? 'Vos' : personaOf(seat).name);
   const oppName = () => S.persona.name;
   // equipo → cómo nombrarlo
@@ -331,6 +333,7 @@
     const m = new window.Match({ seats, target: settings.target, flor: settings.flor, view });
     m.personas = personas;
     S.match = m;
+    S.peek = {};
     setTableMode(n);
     $('ring').innerHTML = personas.map((p, q) => (q === 0 ? '' : `
       <div class="seat pos-${POS[n][q]} ${q % 2 ? 'them' : 'us'}" data-seat="${q}" style="--accent:${p.color}">
@@ -353,7 +356,7 @@
     t.classList.toggle('six', n === 6);
     $('ring').classList.toggle('hidden', !team);
     $('talk').classList.toggle('hidden', !team);
-    S.peek = {};
+    S.tableN = n;
     $('team-center').classList.toggle('hidden', !team);
     document.querySelector('.opp-zone').classList.toggle('hidden', team);
     $('tricks').classList.toggle('hidden', team);
@@ -361,9 +364,32 @@
   }
 
   const live = (m) => m === S.match && !m.stopped;
+  let lastPicaHand = null;
 
   const view = {
-    render(m) { if (live(m)) render(m); },
+    render(m) {
+      if (!live(m)) return;
+      if (m.pica && m.hand && lastPicaHand !== m.hand.no) {
+        lastPicaHand = m.hand.no;
+        log(`— Pica-pica: cada uno juega mano a mano contra el de enfrente. Vos contra ${m.personas[m.duelMap[1]].name} —`, 'sep');
+      }
+      render(m);
+    },
+
+    async picaResults(results) {
+      const m = S.match;
+      if (!live(m)) return;
+      render(m);
+      for (const res of results) {
+        const [a, b] = res.seats;
+        const pa = m.personas[a], pb = m.personas[b];
+        const won = res.won[0] - res.won[1];
+        const txt = won > 0 ? `+${res.won[0]} para tu equipo` : won < 0 ? `+${res.won[1]} para los rivales` : res.won[0] ? `+${res.won[0]} cada uno` : 'sin puntos';
+        log(`Pica-pica · ${pa.name} contra ${pb.name}: ${txt}`, 'pts');
+      }
+      bump(0); bump(1);
+      await sleep(1800);
+    },
 
     async showEvents(events) {
       const m = S.match;
@@ -395,10 +421,14 @@
       }
     },
 
+    handResult(h) {
+      const why = h.endReason === 'noquiero' ? `${E.TRUCO_NAMES[h.trucoLevel + 1]} no querido` : h.endReason === 'mazo' ? 'Al mazo' : 'Mano';
+      if (h.points && h.endReason !== 'game') log(`${why}: +${h.points} para ${who(h.winner)}`, 'pts');
+    },
+
     async handOver(h) {
       const m = S.match;
-      const why = h.endReason === 'noquiero' ? `${E.TRUCO_NAMES[h.trucoLevel + 1]} no querido` : h.endReason === 'mazo' ? 'Al mazo' : 'Mano';
-      if (h.points) log(`${why}: +${h.points} para ${who(h.winner)}`, 'pts');
+      view.handResult(h);
       bump(h.winner);
       say(1, pickOne(h.winner === 1 ? personaOf(1).say.winHand : personaOf(1).say.loseHand), 1600);
       render(m, true);
@@ -674,7 +704,7 @@
   /* ---------- Dibujo ---------- */
   const bubbleTimers = {};
   function say(p, text, ms) {
-    const el = $(p === ME ? 'me-bubble' : isTeamGame() ? 'seat-bubble-' + p : 'opp-bubble');
+    const el = $(p === ME ? 'me-bubble' : isTeamGame() && !inDuel() ? 'seat-bubble-' + p : 'opp-bubble');
     if (!el) return;
     el.textContent = text;
     el.classList.add('show');
@@ -759,9 +789,21 @@
     if (!h) return;
     const legal = myLegal();
 
-    const team = m.seats.length > 2;
+    const teamMatch = m.seats.length > 2;
+    const team = h.n > 2;
     S.isTeam = team;
-    const usName = team ? 'Nosotros' : 'Vos', themName = team ? 'Ellos' : p.name;
+    if (teamMatch && S.tableN !== h.n) {
+      setTableMode(h.n);
+      if (!team) {
+        // pica-pica: la mesa pasa a mano a mano contra el de enfrente
+        const rival = personaOf(1);
+        $('opp-avatar').textContent = rival.avatar;
+        document.querySelector('.table').style.setProperty('--accent', rival.color);
+        $('opp-name').textContent = rival.name;
+        $('opp-level').textContent = 'Pica-pica · mano a mano';
+      }
+    }
+    const usName = teamMatch ? 'Nosotros' : 'Vos', themName = teamMatch ? 'Ellos' : p.name;
     $('top-score').innerHTML = `<span>${usName} <b>${m.scores[ME]}</b></span><span class="sep">·</span><span><b>${m.scores[OPP]}</b> ${themName}</span>`;
     if (team) renderTeamTable(m, h, reveal);
     else renderDuelTable(m, h, reveal);
@@ -798,7 +840,7 @@
   }
 
   function renderDuelTable(m, h, reveal) {
-    const p = S.persona;
+    const p = personaOf(1);
     // Mano del rival
     const showOpp = reveal || h.over;
     const n = h.cards[OPP].length;
@@ -854,6 +896,7 @@
     // Datos de la mano
     const chips = [
       ['Es mano', h.mano === ME ? 'vos' : nameOf(h.mano)],
+      ...(S.match.pica ? [['Pica-pica', 'mano a mano']] : []),
       ['La mano vale', h.trucoLevel + (h.trucoLevel > 1 ? ' · ' + E.TRUCO_NAMES[h.trucoLevel] : '')]
     ];
     if (settings.showEnv) chips.push([h.hasFlor[ME] ? 'Tu flor' : 'Tu envido', h.hasFlor[ME] ? h.florPts[ME] : h.envPoints[ME]]);

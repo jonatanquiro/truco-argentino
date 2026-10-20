@@ -29,6 +29,7 @@ La máquina no hace trampa: sólo usa lo que vería un jugador de verdad (sus ca
 - Flor (se puede desactivar): obligatoria, anula el envido; contraflor, contraflor al resto y con flor me achico.
 - Truco, retruco y vale cuatro; sólo sube quien tiene el quiero.
 - Pardas, alternancia de la mano, irse al mazo (en la primera, sin envido jugado, son 2 puntos).
+- Pica-pica (punto y hacha) en 3 contra 3 a 30: entre los 5 y los 25 puntos se alterna una mano normal con una de mano a mano contra el de enfrente.
 - Por equipos: los asientos alternan equipos, la mano pasa al de la derecha, el envido lo dicen todos desde la mano (gana el mejor de cada equipo; el empate, el más cercano a la mano) y responde el rival que sigue en la ronda. Irse al mazo es abandonar la mano por todo el equipo.
 
 ## Correrlo en tu compu
