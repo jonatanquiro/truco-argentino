@@ -422,6 +422,12 @@
     },
 
     handResult(h) {
+      // el que ganó el envido muestra sus cartas
+      if (h.envResult && h.envResult.accepted && h.envResult.seat !== undefined && !h.florResult) {
+        const q = h.envResult.seat;
+        const cards = tantoCards(h.orig[q]);
+        log(`${nameOf(q)} ${q === ME ? 'mostrás' : 'muestra'} sus tantos: ${cards.map(cardName).join(' y ')} (${h.envPoints[q]})`);
+      }
       const why = h.endReason === 'noquiero' ? `${E.TRUCO_NAMES[h.trucoLevel + 1]} no querido` : h.endReason === 'mazo' ? 'Al mazo' : 'Mano';
       if (h.points && h.endReason !== 'game') log(`${why}: +${h.points} para ${who(h.winner)}`, 'pts');
     },
@@ -504,6 +510,21 @@
     else if (ev.text === 'No quiero.') key = 'noquiero';
     else if (ev.text === 'Me voy al mazo.') key = 'mazo';
     return key && s[key] ? pickOne(s[key]) : ev.text;
+  }
+
+  // Las cartas que forman el envido: las dos del mismo palo que más suman, o la más alta
+  function tantoCards(cards) {
+    const ev = (c) => (c.v >= 10 ? 0 : c.v);
+    let best = [cards.reduce((a, c) => (ev(c) > ev(a) ? c : a))], bestPts = ev(best[0]);
+    for (let i = 0; i < cards.length; i++) {
+      for (let j = i + 1; j < cards.length; j++) {
+        if (cards[i].s === cards[j].s && 20 + ev(cards[i]) + ev(cards[j]) > bestPts) {
+          best = [cards[i], cards[j]];
+          bestPts = 20 + ev(cards[i]) + ev(cards[j]);
+        }
+      }
+    }
+    return best;
   }
 
   /* ---------- Señas entre compañeros ---------- */
@@ -780,7 +801,7 @@
       return st === 'flor' ? `${p} cantó flor y vos también tenés. ¿Qué hacés?` : `${p} cantó ${E.FLOR_NAMES[st].toLowerCase()}. ¿Querés?`;
     }
     if (legal.kind === 'envido') return `${p} cantó ${E.ENV_NAMES[h.envCalls[h.envCalls.length - 1]].toLowerCase()}. ¿Querés?`;
-    if (legal.kind === 'truco') return `${p} cantó ${E.TRUCO_NAMES[h.trucoPending.to].toLowerCase()}. ¿Querés?`;
+    if (legal.kind === 'truco') return `${p} cantó ${E.TRUCO_NAMES[h.trucoPending.to].toLowerCase()}. ¿Querés?${legal.envido ? ' (Podés contestar con envido: el envido está primero.)' : ''}`;
     return 'Te toca: tirá una carta o cantá.';
   }
 

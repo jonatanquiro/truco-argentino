@@ -57,7 +57,7 @@
     }
 
     newHand(opts) {
-      this.hand = E.newHand(opts.mano, { flor: this.flor, n: opts.n });
+      this.hand = E.newHand(opts.mano, { flor: this.flor, n: opts.n, faltaFixed: this.pica ? 6 : null });
       this.handNo++;
       this.hand.no = this.handNo;
       return this.hand;
@@ -114,7 +114,7 @@
     quickDuel(a, b) {
       const map = [a, b];
       const before = this.scores.slice();
-      const h = E.newHand(this.duelMano(a, b), { flor: this.flor, n: 2 });
+      const h = E.newHand(this.duelMano(a, b), { flor: this.flor, n: 2, faltaFixed: 6 });
       h.no = 'pica-' + this.handNo + '-' + a;
       let guard = 0;
       while (!h.over && guard++ < 200) {

@@ -172,6 +172,35 @@ const TEAM = ['4-oro', '5-copa', '6-basto', '7-copa', '2-copa', '1-basto', '7-or
   check('3v3: sólo el 5.º y el 6.º pueden cantar tanto', [0, 1, 2, 3, 4, 5].map((q) => E.isPie(h6, q)), [true, false, false, false, false, true]);
 }
 
+{
+  // "el envido está primero" en equipos: mano 0 canta truco, contesta el rival más cercano a la mano (asiento 1)
+  const t = play({ n: 4, mano: 0, ids: TEAM }, [['truco']]);
+  check('2v2: el truco lo contesta el rival más cercano a la mano', E.actorOf(t.h), 1);
+  check('2v2: el que sigue puede decir "el envido está primero" aunque no sea pie', E.legalActions(t.h, 1).envido, true);
+  const e = play({ n: 4, mano: 0, ids: TEAM }, [['truco'], ['envido', 'envido']]);
+  check('2v2: ese envido lo contesta el pie del otro equipo (asiento 2)', E.actorOf(e.h), 2);
+  const q = play({ n: 4, mano: 0, ids: TEAM }, [['truco'], ['envido', 'envido'], ['quiero']]);
+  check('2v2: resuelto el envido, el truco vuelve al que lo tenía que contestar', [E.actorOf(q.h), !!q.h.trucoPending], [1, true]);
+  // el 3.º canta truco: contesta el rival más cercano a la mano (el asiento 1, que ya jugó) y puede pedir el envido
+  const t3 = play({ n: 4, mano: 0, ids: TEAM }, [['play', '4-oro'], ['play', '7-copa'], ['truco']]);
+  check('2v2: si canta el 3.º, contesta el 2.º y todavía puede ir el envido (su pie no jugó)', [E.actorOf(t3.h), E.legalActions(t3.h, 1).envido], [1, true]);
+  const t4 = play({ n: 4, mano: 0, ids: TEAM }, [['play', '4-oro'], ['play', '7-copa'], ['play', '7-oro'], ['truco']]);
+  check('2v2: si canta el 4.º, contesta el mano; su pie ya jugó, así que no hay envido', [E.actorOf(t4.h), E.legalActions(t4.h, 0).envido], [0, false]);
+}
+// al mazo con un envido sin contestar: cuenta como no querido, más la mano
+tr('al mazo con el envido pendiente = 1 del envido + 1 de la mano', [['envido', 'envido'], ['mazo']], [0, 2]);
+tr('al mazo con envido-envido pendiente = 2 + 1', [['envido', 'envido'], ['envido', 'envido'], ['mazo']], [3, 0]);
+{
+  // pica-pica: la falta envido vale 6
+  const h = E.newHand(1, { n: 2, flor: false, faltaFixed: 6, deck: deckWith(E33) });
+  const sc = [0, 0];
+  E.apply(h, 1, { type: 'envido', kind: 'falta' }, sc, 30);
+  E.apply(h, 0, { type: 'quiero' }, sc, 30);
+  check('pica-pica: la falta envido vale 6', sc, [6, 0]);
+  const r = play({ mano: 1, ids: E33 }, [['envido', 'envido'], ['quiero']]);
+  check('se anota quién ganó el envido para mostrar sus cartas', r.h.envResult.seat, 0);
+}
+
 /* ---------- Fin del partido ---------- */
 {
   const r = play({ mano: 1, ids: E33, scores: [28, 0] }, [['envido', 'envido'], ['quiero']]);

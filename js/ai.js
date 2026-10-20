@@ -214,7 +214,7 @@
     const { scores, target } = ctx;
     const T = me % 2;
     const behind = scores[1 - T] - scores[T];
-    const falta = E.faltaValue(scores, target, T);
+    const falta = E.faltaValue(scores, target, T, h);
     if (legal.falta && pw >= p.envFalta && (falta <= 6 || pw >= 0.93 || behind >= target / 3)) return { type: 'envido', kind: 'falta' };
     if (legal.real && pw >= p.envReal) return { type: 'envido', kind: rnd() < 0.55 ? 'real' : 'envido' };
     if (legal.envido && pw >= p.envCall) return { type: 'envido', kind: 'envido' };
@@ -227,7 +227,7 @@
     const T = me % 2;
     const pw = noisy(pRaw, p);
     const calls = h.envCalls;
-    const accept = E.envAcceptedValue(calls, scores, target, T);
+    const accept = E.envAcceptedValue(calls, scores, target, T, h);
     const decline = E.envDeclinedValue(calls);
     if (scores[1 - T] + decline >= target) return { type: 'quiero' };
     const sure = h.n === 2 && (h.envPoints[me] === 33 || (h.envPoints[me] >= 32 && h.mano === me));
@@ -251,7 +251,7 @@
     const T = me % 2;
     const pf = noisy(pRaw, p);
     const st = h.florPending.stage;
-    const falta = E.faltaValue(scores, target, T);
+    const falta = E.faltaValue(scores, target, T, h);
     if (st === 'flor') {
       if (pf >= 0.85 && legal.resto) return { type: 'resto' };
       if (pf >= 0.5) return { type: 'contraflor' };

@@ -19,6 +19,7 @@
     const deck = o.deck ? o.deck : shuffle(makeDeck());
     const cards = Array.from({ length: n }, (_, p) => deck.slice(p * 3, p * 3 + 3));
     const florOn = o.flor !== false;
+    const faltaFixed = o.faltaFixed || null;   // en los mano a mano de pica-pica la falta vale 6
     const fill = (v) => Array.from({ length: n }, () => (typeof v === 'function' ? v() : v));
     return {
       n,
@@ -46,6 +47,7 @@
       envKnown: fill(null),       // puntos de envido que se llegaron a mostrar
       envResult: null,
       florOn,
+      faltaFixed,
       hasFlor: cards.map((c) => florOn && isFlor(c)),
       florPts: cards.map(florPoints),
       florSung: fill(false),
@@ -66,6 +68,16 @@
     if (h.envPending) return h.envResponder;
     if (h.trucoPending) return h.trucoPending.responder;
     return h.turn;
+  }
+
+  // En equipos, el truco lo contesta el rival más cercano a la mano
+  function trucoResponder(h, p) {
+    if (h.n === 2) return 1 - p;
+    for (let k = 0; k < h.n; k++) {
+      const q = (h.mano + k) % h.n;
+      if (team(q) !== team(p)) return q;
+    }
+    return null;
   }
 
   // El primero del otro equipo (en orden de juego después de p) que cumpla la condición
@@ -97,9 +109,21 @@
     return null;
   }
 
+  // ¿El equipo t todavía puede cantar el tanto? (primera ronda, sin truco querido y su pie sin tirar)
+  function tantoOpen(h, t) {
+    const pie = h.n === 2 ? t : pieOf(h, t);
+    return !h.envDone && !h.envPending && h.trick === 0 && h.trucoLevel === 1 && h.played[pie].length === 0;
+  }
+
+  /*
+   * Quién puede cantar el tanto ahora:
+   *  - en su turno, el pie de cada equipo (mano a mano, cualquiera) antes de tirar su primera carta;
+   *  - si le cantaron truco en la primera, el que contesta puede decir "el envido está primero"
+   *    (aunque ya haya tirado su carta), siempre que el pie de su equipo no haya jugado.
+   */
   function envidoAvailable(h, p) {
-    return isPie(h, p) && !h.envDone && !h.envPending && h.trick === 0 && h.played[p].length === 0 &&
-      h.trucoLevel === 1 && (!h.trucoPending || team(h.trucoPending.caller) !== team(p));
+    if (h.trucoPending) return h.trucoPending.responder === p && team(h.trucoPending.caller) !== team(p) && tantoOpen(h, team(p));
+    return isPie(h, p) && h.played[p].length === 0 && tantoOpen(h, team(p));
   }
 
   function envRaises(calls) {
@@ -133,7 +157,7 @@
     }
     if (h.envPending) {
       Object.assign(a, envRaises(h.envCalls));
-      a.quiero = a.noquiero = true;
+      a.quiero = a.noquiero = a.mazo = true;
       a.kind = 'envido';
       return a;
     }
@@ -151,14 +175,15 @@
     return a;
   }
 
-  function faltaValue(scores, target, winner) {
+  function faltaValue(scores, target, winner, h) {
+    if (h && h.faltaFixed) return h.faltaFixed;
     const lead = Math.max(scores[0], scores[1]);
     if (lead < target / 2) return target - scores[winner];
     return target - lead;
   }
 
-  function envAcceptedValue(calls, scores, target, winner) {
-    if (calls.includes('falta')) return faltaValue(scores, target, winner);
+  function envAcceptedValue(calls, scores, target, winner, h) {
+    if (calls.includes('falta')) return faltaValue(scores, target, winner, h);
     return calls.reduce((s, k) => s + ENV_VALUE[k], 0);
   }
 
@@ -167,10 +192,10 @@
     return calls.slice(0, -1).reduce((s, k) => s + ENV_VALUE[k], 0);
   }
 
-  // Irse al mazo por cuenta propia en la primera, cuando todavía se podía jugar el envido, da un punto más.
+  // Irse al mazo por cuenta propia en la primera, cuando tu equipo todavía podía cantar el tanto, da un punto más.
   // Si te cantaron truco, irte al mazo es como no quererlo; y con el truco querido ya no hay envido: sin punto extra.
-  function mazoExtra(h) {
-    return h.trick === 0 && !h.envDone && !h.trucoPending && h.trucoLevel === 1 ? 1 : 0;
+  function mazoExtra(h, p) {
+    return !h.trucoPending && tantoOpen(h, team(p)) ? 1 : 0;
   }
 
   /*
@@ -257,7 +282,7 @@
       case 'truco': {
         if (h.trucoPending) h.trucoLevel = h.trucoPending.to; // subir implica querer lo anterior
         const to = h.trucoLevel + 1;
-        h.trucoPending = { to, caller: p, responder: nextOpponent(h, p) };
+        h.trucoPending = { to, caller: p, responder: trucoResponder(h, p) };
         h.trucoCalls[p]++;
         ev.push({ t: 'say', p, text: to === 2 ? '¡Truco!' : to === 3 ? '¡Quiero retruco!' : '¡Quiero vale cuatro!', call: 'truco', to });
         break;
@@ -267,7 +292,7 @@
         h.envCallers.push(p);
         h.envPending = true;
         h.envCaller = p;
-        h.envResponder = h.n === 2 ? nextOpponent(h, p) : pieOf(h, 1 - team(p)); // contesta (y sube) el pie del otro equipo
+        h.envResponder = h.n === 2 ? 1 - p : pieOf(h, 1 - team(p)); // contesta (y sube) el pie del otro equipo
         ev.push({ t: 'say', p, text: '¡' + ENV_NAMES[act.kind] + '!', call: act.kind });
         break;
       }
@@ -315,17 +340,18 @@
           h.florPending = null;
           h.florDone = true;
           const w = tantoWinner(h, h.florPts, (q) => h.hasFlor[q], ev, h.florKnown).team;
-          const val = st === 'resto' ? faltaValue(scores, target, w) : 6;
+          const val = st === 'resto' ? faltaValue(scores, target, w, h) : 6;
           scores[w] += val;
           h.florResult = { winner: w, points: val };
           ev.push({ t: 'flor', winner: w, points: val });
         } else if (h.envPending) {
           h.envPending = false;
           h.envDone = true;
-          const w = tantoWinner(h, h.envPoints, null, ev, h.envKnown).team;
-          const val = envAcceptedValue(h.envCalls, scores, target, w);
+          const best = tantoWinner(h, h.envPoints, null, ev, h.envKnown);
+          const w = best.team;
+          const val = envAcceptedValue(h.envCalls, scores, target, w, h);
           scores[w] += val;
-          h.envResult = { winner: w, points: val, accepted: true };
+          h.envResult = { winner: w, points: val, accepted: true, seat: best.seat };
           ev.push({ t: 'envido', winner: w, points: val, accepted: true });
         } else if (h.trucoPending) {
           h.trucoLevel = h.trucoPending.to;
@@ -358,15 +384,20 @@
         break;
       }
       case 'mazo': {
-        // en equipos, irse al mazo es abandonar la mano por todo el equipo
+        // en equipos, irse al mazo es abandonar la mano por todo el equipo; el otro se lleva lo pendiente
         ev.push({ t: 'say', p, text: 'Me voy al mazo.' });
-        const extra = mazoExtra(h);
-        if (h.trucoPending) {
-          endHand(h, team(h.trucoPending.caller), h.trucoLevel + extra, 'mazo');
-          h.trucoPending = null;
-        } else {
-          endHand(h, 1 - team(p), h.trucoLevel + extra, 'mazo');
+        const extra = mazoExtra(h, p);
+        if (h.envPending) {
+          // un envido sin contestar cuenta como no querido
+          const val = envDeclinedValue(h.envCalls);
+          h.envPending = false;
+          h.envDone = true;
+          scores[team(h.envCaller)] += val;
+          h.envResult = { winner: team(h.envCaller), points: val, accepted: false };
+          ev.push({ t: 'envido', winner: team(h.envCaller), points: val, accepted: false });
         }
+        h.trucoPending = null;
+        endHand(h, 1 - team(p), h.trucoLevel + extra, 'mazo');
         break;
       }
     }
@@ -378,7 +409,7 @@
   }
 
   window.Engine = {
-    newHand, actorOf, legalActions, apply, envidoAvailable, mustSingFlor, mazoExtra, tantoWinner, team, isPie, pieOf,
+    newHand, actorOf, legalActions, apply, envidoAvailable, mustSingFlor, mazoExtra, tantoWinner, team, isPie, pieOf, trucoResponder,
     envAcceptedValue, envDeclinedValue, faltaValue, TRUCO_NAMES, ENV_NAMES, FLOR_NAMES
   };
 })();
