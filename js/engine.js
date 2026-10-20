@@ -152,9 +152,10 @@
     return calls.slice(0, -1).reduce((s, k) => s + ENV_VALUE[k], 0);
   }
 
-  // Irse al mazo en la primera sin que se haya jugado el envido (ni la flor) da un punto más
+  // Irse al mazo por cuenta propia en la primera, cuando todavía se podía jugar el envido, da un punto más.
+  // Si te cantaron truco, irte al mazo es como no quererlo; y con el truco querido ya no hay envido: sin punto extra.
   function mazoExtra(h) {
-    return h.trick === 0 && !h.envDone ? 1 : 0;
+    return h.trick === 0 && !h.envDone && !h.trucoPending && h.trucoLevel === 1 ? 1 : 0;
   }
 
   /*

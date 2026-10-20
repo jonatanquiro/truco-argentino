@@ -28,7 +28,7 @@ La máquina no hace trampa: sólo usa lo que vería un jugador de verdad (sus ca
 - Envido, real envido y falta envido con todas sus combinaciones. *El envido está primero*.
 - Flor (se puede desactivar): obligatoria, anula el envido; contraflor, contraflor al resto y con flor me achico.
 - Truco, retruco y vale cuatro; sólo sube quien tiene el quiero.
-- Pardas, alternancia de la mano, irse al mazo (en la primera, sin envido jugado, son 2 puntos).
+- Pardas, alternancia de la mano, irse al mazo: por tu cuenta en la primera, con el envido todavía posible, son 2 puntos; como respuesta a un truco, es como no quererlo (1 punto).
 - Pica-pica (punto y hacha) en 3 contra 3 a 30: entre los 5 y los 25 puntos se alterna una mano normal con una de mano a mano contra el de enfrente.
 - Por equipos: los asientos alternan equipos, la mano pasa al de la derecha, el envido lo dicen todos desde la mano (gana el mejor de cada equipo; el empate, el más cercano a la mano) y responde el rival que sigue en la ronda. Irse al mazo es abandonar la mano por todo el equipo.
 
@@ -52,6 +52,8 @@ y entrá a http://localhost:8000 (el modo offline necesita servirlo por http/htt
 - `js/match.js` — el partido: reparte, pide decisiones a cada asiento y anota.
 - `js/ui.js` — pantallas, mesa y tanteador con fósforos.
 - `sw.js` + `manifest.webmanifest` — instalación y juego sin conexión.
+
+Las reglas tienen pruebas automáticas: `node tests/reglas.test.js` (77 casos: cartas, envido, truco, pardas, mazo, flor y equipos).
 
 Si cambiás archivos, subí el número de `VERSION` en `sw.js` para que las apps instaladas se actualicen.
 
